@@ -50,14 +50,17 @@
 
 <div id="keybar">
   <label for="apikey">🔑 Google AI Studio API key (free, no card — for live filtering):</label>
-  <input id="apikey" type="password" placeholder="sk-ant-..." autocomplete="off" />
+  <input id="apikey" type="password" placeholder="AIza..." autocomplete="off" />
   <span id="keybar-status" style="color:#b7bdae;">not set</span>
-  <span class="note">Kept only in this browser tab's memory — never saved or sent anywhere but api.anthropic.com.</span>
+  <button id="forget-key-btn" type="button" style="display:none; font-family: ui-sans-serif, system-ui; font-size: 11px; background: none; border: 1px solid #666; color: #ccc; border-radius: 3px; padding: 3px 8px; cursor: pointer;">Forget key</button>
+  <span class="note">Saved only in this browser on this device — never sent anywhere but Google's API.</span>
 </div>
 
 <div id="root"></div>
 
 <script>
+  var WISE_KEY_STORAGE = "wise_gemini_api_key";
+
   // Read the key straight from the input at call time (callClaude does this directly),
   // so it works even if a password manager fills the field without firing "input".
   window.__getWiseApiKey__ = function () {
@@ -67,18 +70,53 @@
 
   function refreshKeyStatus() {
     var status = document.getElementById("keybar-status");
+    var forgetBtn = document.getElementById("forget-key-btn");
     var has = window.__getWiseApiKey__().length > 0;
     status.textContent = has ? "✓ key set" : "not set";
     status.style.color = has ? "#7fd08a" : "#b7bdae";
+    forgetBtn.style.display = has ? "inline-block" : "none";
+  }
+
+  function saveKeyToStorage(key) {
+    try {
+      if (key) {
+        localStorage.setItem(WISE_KEY_STORAGE, key);
+      } else {
+        localStorage.removeItem(WISE_KEY_STORAGE);
+      }
+    } catch (e) {
+      // localStorage may be unavailable (e.g. private browsing); the key still works for this session
+    }
   }
 
   var apikeyEl = document.getElementById("apikey");
+
+  // Prefill from a previous visit, if this device has saved one before
+  try {
+    var savedKey = localStorage.getItem(WISE_KEY_STORAGE);
+    if (savedKey) {
+      apikeyEl.value = savedKey;
+      window.__wiseApiKeyCache__ = savedKey;
+    }
+  } catch (e) {}
+
   ["input", "change", "keyup", "paste"].forEach(function (evt) {
     apikeyEl.addEventListener(evt, function () {
       // paste fires before the value is updated in some browsers, so re-check on a tick
-      setTimeout(refreshKeyStatus, 0);
+      setTimeout(function () {
+        refreshKeyStatus();
+        saveKeyToStorage(window.__getWiseApiKey__());
+      }, 0);
     });
   });
+
+  document.getElementById("forget-key-btn").addEventListener("click", function () {
+    apikeyEl.value = "";
+    window.__wiseApiKeyCache__ = "";
+    saveKeyToStorage("");
+    refreshKeyStatus();
+  });
+
   refreshKeyStatus();
 </script>
 
@@ -317,7 +355,7 @@ async function callClaude(system, userContent) {
 
   if (!apiKey) {
     const entered = window.prompt(
-      "Paste your Google AI Studio API key (from aistudio.google.com/apikey).\n\nIt's used only for this request, sent directly to Google's API, and not saved to disk."
+      "Paste your Google AI Studio API key (from aistudio.google.com/apikey).\n\nIt's sent directly to Google's API, and saved only in this browser on this device so you won't be asked again here."
     );
     if (entered && entered.trim()) {
       apiKey = entered.trim();
@@ -325,6 +363,7 @@ async function callClaude(system, userContent) {
       const field = document.getElementById("apikey");
       if (field) field.value = apiKey;
       if (typeof refreshKeyStatus === "function") refreshKeyStatus();
+      if (typeof saveKeyToStorage === "function") saveKeyToStorage(apiKey);
     }
   }
 

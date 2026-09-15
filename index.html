@@ -183,18 +183,35 @@
 </script>
 
 <div id="keybar">
-  <label for="apikey">🔑 Anthropic API key (for live filtering):</label>
-  <input id="apikey" type="password" placeholder="sk-ant-..." autocomplete="off" />
+  <select id="provider-select" style="font-family: ui-sans-serif, system-ui; font-size: 12px; font-weight: 600; padding: 6px 8px; border-radius: 3px; border: 1px solid #444; background: #1f2128; color: #F7F4EC;">
+    <option value="gemini">🔑 Google Gemini (free, no card)</option>
+    <option value="anthropic">🔑 Anthropic Claude (paid, higher quality)</option>
+  </select>
+  <input id="apikey" type="password" placeholder="" autocomplete="off" />
   <span id="keybar-status" style="color:#b7bdae;">not set</span>
   <button id="forget-key-btn" type="button" style="display:none; font-family: ui-sans-serif, system-ui; font-size: 11px; background: none; border: 1px solid #666; color: #ccc; border-radius: 3px; padding: 3px 8px; cursor: pointer;">Forget key</button>
   <button id="install-app-btn" type="button" style="display:none; font-family: ui-sans-serif, system-ui; font-size: 12px; font-weight: 600; background: #3C6E4F; border: none; color: #F7F4EC; border-radius: 3px; padding: 5px 12px; cursor: pointer;">📲 Install App</button>
-  <span class="note">Saved only in this browser on this device — never sent anywhere but Anthropic's API.</span>
+  <span class="note" id="keybar-note">Saved only in this browser on this device.</span>
 </div>
 
 <div id="root"></div>
 
 <script>
-  var WISE_KEY_STORAGE = "wise_anthropic_api_key";
+  var WISE_PROVIDER_STORAGE = "wise_api_provider";
+  var PROVIDER_KEY_STORAGE = {
+    gemini: "wise_gemini_api_key",
+    anthropic: "wise_anthropic_api_key",
+  };
+  var PROVIDER_META = {
+    gemini: { placeholder: "AIza...", note: "Saved only in this browser on this device — never sent anywhere but Google's API." },
+    anthropic: { placeholder: "sk-ant-...", note: "Saved only in this browser on this device — never sent anywhere but Anthropic's API." },
+  };
+
+  window.__wiseProvider__ = "gemini"; // default: free, no card needed
+
+  function currentProviderStorageKey() {
+    return PROVIDER_KEY_STORAGE[window.__wiseProvider__];
+  }
 
   // Read the key straight from the input at call time (callClaude does this directly),
   // so it works even if a password manager fills the field without firing "input".
@@ -214,26 +231,57 @@
 
   function saveKeyToStorage(key) {
     try {
+      var storageKey = currentProviderStorageKey();
       if (key) {
-        localStorage.setItem(WISE_KEY_STORAGE, key);
+        localStorage.setItem(storageKey, key);
       } else {
-        localStorage.removeItem(WISE_KEY_STORAGE);
+        localStorage.removeItem(storageKey);
       }
     } catch (e) {
       // localStorage may be unavailable (e.g. private browsing); the key still works for this session
     }
   }
 
-  var apikeyEl = document.getElementById("apikey");
+  function loadKeyForCurrentProvider() {
+    var apikeyEl = document.getElementById("apikey");
+    try {
+      var saved = localStorage.getItem(currentProviderStorageKey());
+      apikeyEl.value = saved || "";
+      window.__wiseApiKeyCache__ = saved || "";
+    } catch (e) {
+      apikeyEl.value = "";
+    }
+    refreshKeyStatus();
+  }
 
-  // Prefill from a previous visit, if this device has saved one before
+  function applyProviderUI() {
+    var meta = PROVIDER_META[window.__wiseProvider__];
+    document.getElementById("apikey").placeholder = meta.placeholder;
+    document.getElementById("keybar-note").textContent = meta.note;
+  }
+
+  var apikeyEl = document.getElementById("apikey");
+  var providerSelect = document.getElementById("provider-select");
+
+  // Restore last-chosen provider, if any (defaults to gemini otherwise)
   try {
-    var savedKey = localStorage.getItem(WISE_KEY_STORAGE);
-    if (savedKey) {
-      apikeyEl.value = savedKey;
-      window.__wiseApiKeyCache__ = savedKey;
+    var savedProvider = localStorage.getItem(WISE_PROVIDER_STORAGE);
+    if (savedProvider === "gemini" || savedProvider === "anthropic") {
+      window.__wiseProvider__ = savedProvider;
     }
   } catch (e) {}
+  providerSelect.value = window.__wiseProvider__;
+  applyProviderUI();
+  loadKeyForCurrentProvider();
+
+  providerSelect.addEventListener("change", function () {
+    window.__wiseProvider__ = providerSelect.value;
+    try {
+      localStorage.setItem(WISE_PROVIDER_STORAGE, window.__wiseProvider__);
+    } catch (e) {}
+    applyProviderUI();
+    loadKeyForCurrentProvider();
+  });
 
   ["input", "change", "keyup", "paste"].forEach(function (evt) {
     apikeyEl.addEventListener(evt, function () {
@@ -536,7 +584,7 @@ function extractJson(rawText) {
   return JSON.parse(jsonText);
 }
 
-async function callClaude(system, userContent) {
+async function getApiKeyOrPrompt(providerLabel, placeholderHint) {
   let apiKey = (window.__getWiseApiKey__ ? window.__getWiseApiKey__() : "").trim();
 
   if (!apiKey && window.__wiseApiKeyCache__) {
@@ -545,7 +593,7 @@ async function callClaude(system, userContent) {
 
   if (!apiKey) {
     const entered = window.prompt(
-      "Paste your Anthropic API key (from platform.claude.com, starts with sk-ant-...).\n\nIt's sent directly to Anthropic's API, and saved only in this browser on this device so you won't be asked again here."
+      `Paste your ${providerLabel} API key (${placeholderHint}).\n\nIt's sent directly to that provider's API, and saved only in this browser on this device so you won't be asked again here.`
     );
     if (entered && entered.trim()) {
       apiKey = entered.trim();
@@ -558,8 +606,13 @@ async function callClaude(system, userContent) {
   }
 
   if (!apiKey) {
-    throw new Error("An API key is required to use live filtering in this standalone file.");
+    throw new Error("An API key is required to use live filtering.");
   }
+  return apiKey;
+}
+
+async function callAnthropic(system, userContent) {
+  const apiKey = await getApiKeyOrPrompt("Anthropic", "from platform.claude.com, starts with sk-ant-...");
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -619,6 +672,70 @@ async function callClaude(system, userContent) {
     }
     throw new Error(`Couldn't parse the model's response as JSON. Raw reply: ${rawText.slice(0, 300)}`);
   }
+}
+
+async function callGemini(system, userContent) {
+  const apiKey = await getApiKeyOrPrompt("Google AI Studio", "from aistudio.google.com/apikey");
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: "user", parts: [{ text: userContent }] }],
+        generationConfig: {
+          maxOutputTokens: 2048,
+          temperature: 0.4,
+          thinkingConfig: { thinkingLevel: "low" },
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`API returned ${response.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message || "API returned an error.");
+
+  const candidate = (data.candidates || [])[0];
+  const rawText = ((candidate && candidate.content && candidate.content.parts) || [])
+    .map((p) => p.text || "")
+    .join("")
+    .trim();
+
+  if (!rawText) {
+    const finishReason = candidate && candidate.finishReason;
+    throw new Error(
+      finishReason
+        ? `The model stopped without returning text (reason: ${finishReason}). Try again.`
+        : "The model returned no text content to parse."
+    );
+  }
+
+  try {
+    return extractJson(rawText);
+  } catch (parseErr) {
+    const finishReason = candidate && candidate.finishReason;
+    if (finishReason === "MAX_TOKENS") {
+      throw new Error(
+        `The response got cut off before finishing (hit the token limit). Raw reply: ${rawText.slice(0, 300)}`
+      );
+    }
+    throw new Error(`Couldn't parse the model's response as JSON. Raw reply: ${rawText.slice(0, 300)}`);
+  }
+}
+
+async function callClaude(system, userContent) {
+  const provider = window.__wiseProvider__ || "gemini";
+  if (provider === "anthropic") {
+    return callAnthropic(system, userContent);
+  }
+  return callGemini(system, userContent);
 }
 
 function slugify(term) {

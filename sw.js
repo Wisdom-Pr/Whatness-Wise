@@ -5,7 +5,7 @@
 // version made updates invisible until the cache was manually cleared).
 // The cached copy is kept purely as an offline fallback.
 
-const CACHE_NAME = "wisedefine-v4";
+const CACHE_NAME = "wisedefine-v6";
 const CORE_ASSETS = ["./", "./index.html"];
 
 self.addEventListener("install", (event) => {

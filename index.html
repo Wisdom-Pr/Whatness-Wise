@@ -579,6 +579,17 @@ async function callClaude(system, userContent) {
 
   if (!response.ok) {
     const errText = await response.text();
+    if (response.status === 401) {
+      const masked =
+        apiKey.length > 14
+          ? apiKey.slice(0, 10) + "..." + apiKey.slice(-4) + " (length " + apiKey.length + ")"
+          : "(too short to be a real key — length " + apiKey.length + ")";
+      throw new Error(
+        `API returned 401 (key not recognized). What was actually sent: ${masked}. ` +
+        `A real Anthropic key looks like sk-ant-api03-... and is much longer than 14 characters. ` +
+        `Raw error: ${errText.slice(0, 150)}`
+      );
+    }
     throw new Error(`API returned ${response.status}: ${errText.slice(0, 200)}`);
   }
 

@@ -100,6 +100,14 @@
   window.__wiseUserPlan__ = "free";
   window.__wiseLookupsToday__ = 0;
   window.__wiseLookupDate__ = null;
+  // "Today" in Addis Ababa time — the same day boundary the server uses.
+  window.__wiseToday__ = function () {
+    try {
+      return new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Addis_Ababa" });
+    } catch (e) {
+      return new Date().toISOString().slice(0, 10);
+    }
+  };
   window.__wiseIsSignedIn__ = function () {
     return !!window.__wiseUser__;
   };
@@ -122,7 +130,7 @@
       var quotaEl = document.getElementById("account-quota-display");
       var upgradeBtn = document.getElementById("account-upgrade-btn");
       if (window.__wiseUserPlan__ === "free") {
-        var today = new Date().toISOString().slice(0, 10);
+        var today = window.__wiseToday__();
         var usedToday = window.__wiseLookupDate__ === today ? window.__wiseLookupsToday__ : 0;
         var remaining = Math.max(0, 5 - usedToday);
         quotaEl.textContent = " (" + remaining + "/5 lookups left today)";
@@ -176,7 +184,7 @@
         .eq("id", userId)
         .single();
       if (result.data) {
-        var today = new Date().toISOString().slice(0, 10);
+        var today = window.__wiseToday__();
         var rawPlan = result.data.plan || "free";
         var proUntil = result.data.pro_until || null;
         // An expired manually-granted Pro period quietly reverts to free in the
@@ -868,13 +876,36 @@ async function callSharedBackend(system, userContent) {
 
   if (!response.ok) {
     const errText = await response.text();
-    if (response.status === 401) {
-      throw new Error("Your sign-in session isn't valid for this request — try signing out and back in.");
+    let errJson = null;
+    try { errJson = JSON.parse(errText); } catch (e) {}
+
+    // Daily free limit reached — the server is the only one that decides this.
+    if (response.status === 429 || (errJson && errJson.error === "limit_reached")) {
+      window.__wiseLookupsToday__ = 5;
+      window.__wiseLookupDate__ = window.__wiseToday__();
+      if (typeof accUpdateUI === "function") accUpdateUI();
+      const modal = document.getElementById("upgrade-modal");
+      if (modal) modal.style.display = "flex";
+      throw new Error(
+        (errJson && errJson.message) ||
+        "You've used your 5 free lookups today. Upgrade to Pro for unlimited lookups, or come back tomorrow."
+      );
     }
-    throw new Error(`Shared backend returned ${response.status}: ${errText.slice(0, 200)}`);
+
+    if (response.status === 401) {
+      throw new Error("Your sign-in session has expired — please sign out and sign in again.");
+    }
+    throw new Error("WiseDefine couldn't complete this lookup right now — please try again in a moment.");
   }
 
   const data = await response.json();
+
+  // Keep the "x/5 lookups left today" line in step with the server's count.
+  if (data.quota && data.quota.plan === "free" && typeof data.quota.remaining === "number") {
+    window.__wiseLookupsToday__ = Math.max(0, 5 - data.quota.remaining);
+    window.__wiseLookupDate__ = window.__wiseToday__();
+    if (typeof accUpdateUI === "function") accUpdateUI();
+  }
   if (data.error) throw new Error(data.error.message || data.error || "Shared backend returned an error.");
 
   const candidate = (data.candidates || [])[0];
@@ -1279,7 +1310,7 @@ function WiseApp() {
             {!hasTermMatch && query.trim() && (
               <div style={{ marginTop: 8, marginBottom: 14 }}>
                 <p style={{ fontFamily: "ui-sans-serif, system-ui", fontSize: 13, color: NAVY, marginBottom: 10 }}>
-                  "{query}" isn't in the dictionary yet. WiseDefine can look up its standard definition and run it
+                  "{query.trim()}" isn't in the dictionary yet. WiseDefine can look up its standard definition and run it
                   through the filter automatically.
                 </p>
                 <button

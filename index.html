@@ -880,7 +880,7 @@ async function callSharedBackend(system, userContent) {
     try { errJson = JSON.parse(errText); } catch (e) {}
 
     // Daily free limit reached — the server is the only one that decides this.
-    if (response.status === 429 || (errJson && errJson.error === "limit_reached")) {
+    if (errJson && errJson.error === "limit_reached") {
       window.__wiseLookupsToday__ = 5;
       window.__wiseLookupDate__ = window.__wiseToday__();
       if (typeof accUpdateUI === "function") accUpdateUI();
@@ -894,6 +894,11 @@ async function callSharedBackend(system, userContent) {
 
     if (response.status === 401) {
       throw new Error("Your sign-in session has expired — please sign out and sign in again.");
+    }
+    // A 429 that is NOT our daily limit comes from the AI service itself
+    // (its own usage quota is exhausted for now) — not the user's fault.
+    if (response.status === 429) {
+      throw new Error("WiseDefine's AI service is at capacity right now — please try again a little later.");
     }
     throw new Error("WiseDefine couldn't complete this lookup right now — please try again in a moment.");
   }

@@ -1236,6 +1236,16 @@ function WiseApp() {
           </div>
         </div>
 
+        {/* Mission statement — the first thing visitors read */}
+        <div style={{ marginTop: 14, padding: "12px 14px", borderLeft: "3px solid #A6363C", background: "rgba(20,22,28,0.04)" }}>
+          <div style={{ fontFamily: "ui-serif, Georgia, serif", fontSize: 16, lineHeight: 1.45, fontWeight: 700, color: INK }}>
+            Poor definition—or no definition—teaching is the silent killer.
+          </div>
+          <div style={{ fontFamily: "ui-serif, Georgia, serif", fontSize: 16, lineHeight: 1.45, fontWeight: 700, color: "#A6363C", marginTop: 2 }}>
+            And WiseDefine eliminates that.
+          </div>
+        </div>
+
         <div style={{ height: 1, background: INK, margin: "16px 0 14px" }} />
 
         {/* Tabs */}
@@ -1388,6 +1398,119 @@ async function wiseCheckEnabledAndMount() {
 }
 
 wiseCheckEnabledAndMount();
+</script>
+
+
+<!-- ===== Feedback (visitors and signed-in users) ===== -->
+<button id="feedback-open-btn" type="button" aria-label="Send feedback"
+  style="position:fixed; right:16px; bottom:16px; z-index:900; font-family:ui-sans-serif,system-ui; font-size:13px; font-weight:600; background:#14161C; color:#F7F4EC; border:none; border-radius:20px; padding:10px 16px; box-shadow:0 2px 8px rgba(0,0,0,0.25); cursor:pointer;">
+  Feedback
+</button>
+
+<div id="feedback-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1001; align-items:center; justify-content:center;">
+  <div style="background:#F7F4EC; border-radius:6px; padding:24px; max-width:440px; width:90%; font-family:ui-sans-serif,system-ui; color:#14161C;">
+    <div style="font-family:ui-serif,Georgia,serif; font-size:22px; font-weight:700; margin-bottom:6px;">Your feedback</div>
+    <p style="font-size:13px; color:#2A2A2E; margin:0 0 14px;">Tell us what works, what doesn't, or what WiseDefine should do next.</p>
+
+    <label for="feedback-type" style="font-size:12px; font-weight:600;">Type</label>
+    <select id="feedback-type" style="width:100%; margin:4px 0 12px; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:14px; background:#fff;">
+      <option value="suggestion">Suggestion</option>
+      <option value="problem">Problem / bug</option>
+      <option value="definition">A definition is wrong or unclear</option>
+      <option value="praise">Praise</option>
+      <option value="other">Other</option>
+    </select>
+
+    <label for="feedback-message" style="font-size:12px; font-weight:600;">Message</label>
+    <textarea id="feedback-message" rows="5" maxlength="2000" placeholder="Write your feedback here…"
+      style="width:100%; box-sizing:border-box; margin:4px 0 12px; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:14px; font-family:inherit; resize:vertical;"></textarea>
+
+    <div id="feedback-email-wrap">
+      <label for="feedback-email" style="font-size:12px; font-weight:600;">Email (optional, if you'd like a reply)</label>
+      <input id="feedback-email" type="email" maxlength="200" placeholder="you@example.com"
+        style="width:100%; box-sizing:border-box; margin:4px 0 12px; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:14px;" />
+    </div>
+
+    <!-- Hidden trap field: real people never fill it, simple spam bots do. -->
+    <input id="feedback-website" type="text" tabindex="-1" autocomplete="off" style="position:absolute; left:-9999px; width:1px; height:1px; opacity:0;" />
+
+    <div id="feedback-status" style="font-size:13px; min-height:18px; margin-bottom:10px;"></div>
+
+    <button id="feedback-send-btn" type="button" style="font-family:ui-sans-serif,system-ui; font-size:14px; font-weight:600; background:#3C6E4F; border:none; color:#fff; border-radius:4px; padding:10px 14px; width:100%; margin-bottom:8px; cursor:pointer;">Send feedback</button>
+    <button id="feedback-close-btn" type="button" style="font-family:ui-sans-serif,system-ui; font-size:13px; font-weight:600; background:#14161C; border:none; color:#fff; border-radius:4px; padding:9px 14px; width:100%; cursor:pointer;">Close</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  var modal = document.getElementById("feedback-modal");
+  var statusEl = document.getElementById("feedback-status");
+  var sendBtn = document.getElementById("feedback-send-btn");
+  var lastSentAt = 0;
+
+  function setStatus(text, ok) {
+    statusEl.textContent = text;
+    statusEl.style.color = ok ? "#3C6E4F" : "#A6363C";
+  }
+
+  async function currentUser() {
+    try {
+      if (!window.wiseSupabase) return null;
+      var res = await wiseSupabase.auth.getSession();
+      return res && res.data && res.data.session ? res.data.session.user : null;
+    } catch (e) { return null; }
+  }
+
+  document.getElementById("feedback-open-btn").addEventListener("click", async function () {
+    setStatus("", true);
+    var user = await currentUser();
+    // Signed-in users don't need to type an email — we already know who they are.
+    document.getElementById("feedback-email-wrap").style.display = user ? "none" : "block";
+    modal.style.display = "flex";
+  });
+
+  document.getElementById("feedback-close-btn").addEventListener("click", function () {
+    modal.style.display = "none";
+  });
+
+  sendBtn.addEventListener("click", async function () {
+    var message = document.getElementById("feedback-message").value.trim();
+    var type = document.getElementById("feedback-type").value;
+    var email = document.getElementById("feedback-email").value.trim();
+    var trap = document.getElementById("feedback-website").value;
+
+    if (trap) { modal.style.display = "none"; return; }           // bot: silently ignore
+    if (message.length < 3) { setStatus("Please write a few words first.", false); return; }
+    if (Date.now() - lastSentAt < 30000) { setStatus("Thanks! Please wait a moment before sending more.", false); return; }
+    if (!window.wiseSupabase) { setStatus("Feedback can't be sent right now — please try again later.", false); return; }
+
+    sendBtn.disabled = true;
+    setStatus("Sending…", true);
+
+    var user = await currentUser();
+    var row = {
+      type: type,
+      message: message,
+      email: user ? (user.email || null) : (email || null),
+      page: location.pathname + location.hash,
+      user_agent: navigator.userAgent.slice(0, 300)
+    };
+    if (user) row.user_id = user.id;
+
+    try {
+      var result = await wiseSupabase.from("feedback").insert(row);
+      if (result.error) throw result.error;
+      lastSentAt = Date.now();
+      document.getElementById("feedback-message").value = "";
+      setStatus("Thank you — your feedback was sent.", true);
+      setTimeout(function () { modal.style.display = "none"; }, 1500);
+    } catch (e) {
+      setStatus("Sorry, it couldn't be sent. Please try again later.", false);
+    } finally {
+      sendBtn.disabled = false;
+    }
+  });
+})();
 </script>
 
 </body>

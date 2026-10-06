@@ -82,13 +82,15 @@ async function start() {
     return;
   }
   renderShell();
-  loadStats(); loadSwitch(); loadFeedback(); loadWords(); loadBlocked();
+  loadStats(); loadAccounts(); loadDefs(); loadSwitch(); loadFeedback(); loadWords(); loadBlocked();
 }
 
 function renderShell() {
   app.innerHTML =
     '<h2>Overview</h2><div class="cards" id="cards">Loading…</div>' +
     '<h2>Last 14 days</h2><div class="panel"><table id="daily"></table></div>' +
+    '<h2>Accounts</h2><div class="panel"><div class="row" style="margin-bottom:8px"><input type="text" id="acc-q" placeholder="search email" /><span id="acc-count" style="font-size:12px;color:#6b6b72"></span></div><div style="overflow-x:auto"><table id="acc"></table></div></div>' +
+    '<h2>Saved definitions</h2><div class="panel"><div class="row" style="margin-bottom:8px"><input type="text" id="def-q" placeholder="search text" /><span id="def-count" style="font-size:12px;color:#6b6b72"></span></div><div id="defs">Loading…</div></div>' +
     '<h2>Feedback</h2>' +
     '<div class="panel" style="margin-bottom:12px"><div class="switch"><strong>Feedback button on the site:</strong> <span id="sw-state">…</span> <button id="sw-btn" class="dark">…</button></div><div class="msgline" id="sw-msg"></div></div>' +
     '<div class="row" style="margin-bottom:10px">' +
@@ -103,8 +105,10 @@ function renderShell() {
 
   document.getElementById("f-status").onchange = function () { state.statusFilter = this.value; loadFeedback(); };
   document.getElementById("f-type").onchange = function () { state.typeFilter = this.value; loadFeedback(); };
-  document.getElementById("f-refresh").onclick = function () { loadStats(); loadFeedback(); };
+  document.getElementById("f-refresh").onclick = function () { loadStats(); loadAccounts(); loadDefs(); loadFeedback(); };
   document.getElementById("w-add").onclick = addWord;
+  document.getElementById("acc-q").oninput = renderAccounts;
+  document.getElementById("def-q").oninput = renderDefs;
 }
 
 async function loadStats() {
@@ -131,6 +135,58 @@ async function loadStats() {
       function cell(v, cls) { return '<span class="bar ' + cls + '" style="width:' + Math.round(80 * v / max) + 'px"></span>' + v; }
       return '<tr><td>' + esc(x.day) + '</td><td>' + cell(x.visits, "") + '</td><td>' + cell(x.signups, "g") + '</td><td>' + cell(x.lookups, "r") + '</td></tr>';
     }).join("");
+}
+
+var accounts = [], defs = [];
+function fmtDate(ts) { if (!ts) return "—"; try { return new Date(ts).toLocaleDateString(); } catch (e) { return ts; } }
+
+async function loadAccounts() {
+  var r = await sb.rpc("admin_accounts");
+  if (r.error) { document.getElementById("acc").innerHTML = "<tr><td>Couldn't load accounts: " + esc(r.error.message) + "</td></tr>"; return; }
+  accounts = r.data || []; renderAccounts();
+}
+function renderAccounts() {
+  var q = (document.getElementById("acc-q").value || "").toLowerCase();
+  var rows = accounts.filter(function (a) { return !q || String(a.email || "").toLowerCase().indexOf(q) !== -1; });
+  document.getElementById("acc-count").textContent = rows.length + " of " + accounts.length;
+  var today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Addis_Ababa" });
+  document.getElementById("acc").innerHTML =
+    '<tr><th>Email</th><th>Plan</th><th>Signed up</th><th>Last sign-in</th><th>Lookups today</th></tr>' +
+    rows.map(function (a) {
+      var plan = a.plan || "free";
+      if (plan === "pro") plan = a.pro_until ? ("pro until " + a.pro_until) : "pro (lifetime)";
+      var used = (a.lookup_date === today) ? (a.lookups_today || 0) : 0;
+      return '<tr><td>' + esc(a.email) + (a.is_admin ? ' <span class="tag pinned">admin</span>' : '') + '</td><td>' + esc(plan) + '</td><td>' + esc(fmtDate(a.created_at)) + '</td><td>' + esc(fmt(a.last_sign_in_at || "")) + '</td><td>' + used + '</td></tr>';
+    }).join("");
+}
+
+async function loadDefs() {
+  var r = await sb.rpc("admin_saved_definitions");
+  if (r.error) { document.getElementById("defs").textContent = "Couldn't load saved definitions: " + r.error.message; return; }
+  defs = r.data || []; renderDefs();
+}
+function renderDefs() {
+  var q = (document.getElementById("def-q").value || "").toLowerCase();
+  var rows = defs.filter(function (d) { return !q || String(d.definition || "").toLowerCase().indexOf(q) !== -1; });
+  document.getElementById("def-count").textContent = rows.length + " of " + defs.length;
+  var box = document.getElementById("defs");
+  if (!rows.length) { box.innerHTML = '<p style="font-size:13px;color:#6b6b72;margin:0">Nothing here.</p>'; return; }
+  box.innerHTML = rows.map(function (d, i) {
+    var text = String(d.definition || "");
+    var first = text.split("\n").find(function (l) { return l.trim(); }) || "(empty)";
+    return '<details class="fb" style="padding:10px"><summary style="cursor:pointer;font-size:14px"><strong>' + esc(first.replace(/[#*_`]/g, "").slice(0, 120)) + '</strong>' +
+      '<div class="meta" style="margin:4px 0 0">' + esc(fmt(d.created_at)) + ' · ' + esc(d.model || "") + ' · reused ' + (d.hits || 0) + ' time' + (d.hits === 1 ? '' : 's') + '</div></summary>' +
+      '<div class="msg" style="margin-top:10px">' + esc(text) + '</div>' +
+      '<button class="danger" data-k="' + esc(d.key) + '">Delete this saved definition</button></details>';
+  }).join("");
+  box.querySelectorAll("button[data-k]").forEach(function (b) {
+    b.onclick = async function () {
+      if (!confirm("Delete this saved definition? The next lookup of this term will create a fresh one.")) return;
+      var r = await sb.rpc("admin_delete_definition", { p_key: b.dataset.k });
+      if (r.error) alert("Couldn't delete: " + r.error.message);
+      loadDefs(); loadStats();
+    };
+  });
 }
 
 async function loadSwitch() {

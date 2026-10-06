@@ -883,6 +883,9 @@ async function callSharedBackend(system, userContent) {
 
   const data = await response.json();
 
+  // Private statistics: count this lookup (anonymous, admin-only).
+  if (window.__wiseLogEvent__) window.__wiseLogEvent__("lookup");
+
   // Keep the "x/5 lookups left today" line in step with the server's count.
   if (data.quota && data.quota.plan === "free" && typeof data.quota.remaining === "number") {
     window.__wiseLookupsToday__ = Math.max(0, 5 - data.quota.remaining);
@@ -1443,6 +1446,43 @@ wiseCheckEnabledAndMount();
 
 <script>
 (function () {
+  // ---- Private visitor statistics (anonymous: a random id, no names, no IP) ----
+  function visitorId() {
+    try {
+      var id = localStorage.getItem("wd_vid");
+      if (!id) {
+        id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
+        localStorage.setItem("wd_vid", id);
+      }
+      return id;
+    } catch (e) { return null; }
+  }
+  window.__wiseLogEvent__ = function (kind) {
+    try {
+      if (!window.wiseSupabase) return;
+      wiseSupabase.from("site_events").insert({ kind: kind, visitor_id: visitorId() }).then(function () {});
+    } catch (e) {}
+  };
+  function logVisitOnce() {
+    try {
+      if (sessionStorage.getItem("wd_visit_logged")) return;
+      if (!window.wiseSupabase) { setTimeout(logVisitOnce, 1500); return; }
+      sessionStorage.setItem("wd_visit_logged", "1");
+      window.__wiseLogEvent__("visit");
+    } catch (e) {}
+  }
+  setTimeout(logVisitOnce, 1200);
+
+  // ---- Feedback on/off switch (set from the admin page) ----
+  function applyFeedbackSwitch() {
+    if (!window.wiseSupabase) { setTimeout(applyFeedbackSwitch, 1500); return; }
+    wiseSupabase.from("site_settings").select("feedback_enabled").eq("id", 1).maybeSingle().then(function (res) {
+      var on = !(res && res.data && res.data.feedback_enabled === false);
+      document.getElementById("feedback-open-btn").style.display = on ? "block" : "none";
+    });
+  }
+  setTimeout(applyFeedbackSwitch, 1200);
+
   var modal = document.getElementById("feedback-modal");
   var statusEl = document.getElementById("feedback-status");
   var sendBtn = document.getElementById("feedback-send-btn");

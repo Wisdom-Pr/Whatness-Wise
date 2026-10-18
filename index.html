@@ -533,7 +533,7 @@
 </script>
 
 <script type="text/babel" data-presets="react">
-const { useState } = React;
+const { useState, useEffect, useRef } = React;
 
 const EMBLEM_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAMAAAD04JH5AAAB4FBMVEUAAAD///8AXqT39OzuAAAAdDQAAAAgICBAQEBgYGCAgICfn5+/v7/f398ADBQAGCkAIz4AL1IAO2YARnsAUpAfHh4+PTtdXFh8enaamJS5t7HY1s4eAAA8AABZAAB3AACVAACyAADQAAAADgYAHQ0ALBQAOhoASCAAVycAZi7f6/S/1+ifw92ArtJgmsZAhrsgcq/+/v39/Pr8+/j7+vb6+PP59/H49e7939/7v7/5n5/2gID0YGDyQEDwICDf7ua/3Myfy7OAuppgqIBAl2cghU0fca0+hLZdlr98qciavNG5ztrY4eMeUpA8RntZO2Z3L1KVIz6yGCnQDBQAYZYAZIgAZnoAaWwAbF4AblAAcUL21s71t7H0mJTyenbxXFjwPTvvHh7Y5NW51L6axKd8tJBdpHk+lGIfhEvQDgayHQ2VLBR3OhpZSCA8VyceZi4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD///////////////////////////////8AXqQAXqQAXqQAXqQAXqQAXqQAXqQAXqT39Oz39Oz39Oz39Oz39Oz39Oz39Oz39OzuAADuAADuAADuAADuAADuAADuAADuAAAAdDQAdDQAdDQAdDQAdDQAdDQAdDQAdDShN7fXAAAAoHRSTlP///////8A////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////HDlVcY6qxuMcOVVxjqrG4xw5VXGOqsbjHDlVcY6qxuMcOVVxjqrG4xw5VXGOqsbj2GeBjgAAEHVJREFUeNq1W0l3GzcS7hZkNbemE1tsbrZju0+KbclAb5YtiTOTsSiSmkPem5v2rJ7DvBdx1VFHHedIKn92CmigG2iSTVJJ6sWK3SJRH6q+qkIDBW3jYXJ7O+ne/96n0vv9/noyvnvgQNrK37gZ3/cGw5Fta5LYo9Gw35vc/uUAxt3BUNGsij3s34//OgCTXppyIaNBd/xXABgvpZ0bYnB/9ycDmAxG2koy6o//RAD3y09eNsPkTwJwP5ytoFgyLCZGyX44hIUA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";
 
@@ -1050,11 +1050,11 @@ function EntryCard({ entry, entries, expanded, onToggle }) {
       <div style={{ fontFamily: "ui-sans-serif, system-ui", fontSize: 12, color: NAVY, marginTop: 2, marginBottom: 8 }}>
         {entry.domain}
         {pairEntry ? ` · paired with ${pairEntry.term}` : ""}
-        {entry.hasPermanentPage && (
+        {(entry.hasPermanentPage || entry.page) && (
           <>
             {" · "}
             <a
-              href={`${entry.id}.html`}
+              href={entry.page || `${entry.id}.html`}
               style={{ color: CRIMSON }}
               target="_blank"
               rel="noopener noreferrer"
@@ -1234,10 +1234,66 @@ function WiseApp() {
   const [query, setQuery] = useState("");
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState("");
+  const [library, setLibrary] = useState([]);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [activeSuggest, setActiveSuggest] = useState(-1);
+
+  // Saved STEM 333 library: defined by WiseDefine, stored with the app, free and instant.
+  useEffect(() => {
+    fetch("library/stem.json")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data && Array.isArray(data.entries)) setLibrary(data.entries); })
+      .catch(() => {});
+  }, []);
+
+  // Opening the app from a term page (?q=Stress) shows that term straight away.
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get("q");
+      if (q) setQuery(q);
+    } catch (e) {}
+  }, []);
 
   const normalize = (s) => s.toLowerCase().replace(/[-_\s]+/g, " ").trim();
 
-  const filtered = entries.filter((e) => {
+  // Everything searchable: the app's own entries first, then library terms not already there.
+  const allEntries = React.useMemo(() => {
+    const have = new Set(entries.map((e) => e.id));
+    return [...entries, ...library.filter((e) => !have.has(e.id))];
+  }, [entries, library]);
+
+  const termMatches = (e, q) => {
+    const termWords = normalize(e.term).split(" ");
+    const qWords = q.split(" ");
+    return normalize(e.term).includes(q) || qWords.every((qw) => termWords.some((w) => w.startsWith(qw)));
+  };
+  const rank = (e, q) => {
+    const t = normalize(e.term);
+    if (t === q) return 0;
+    if (t.startsWith(q)) return 1;
+    if (t.split(" ").some((w) => w.startsWith(q))) return 2;
+    return 3;
+  };
+
+  const suggestions = (() => {
+    const q = normalize(query);
+    if (!q) return [];
+    return allEntries
+      .filter((e) => termMatches(e, q))
+      .sort((a, b) => rank(a, q) - rank(b, q) || a.term.localeCompare(b.term))
+      .slice(0, 8);
+  })();
+  const exactHit = suggestions.length > 0 && normalize(suggestions[0].term) === normalize(query);
+
+  const pickSuggestion = (e) => {
+    setQuery(e.term);
+    setExpandedId(e.id);
+    setSuggestOpen(false);
+    setActiveSuggest(-1);
+  };
+
+  const searchPool = normalize(query) ? allEntries : entries;
+  const filtered = searchPool.filter((e) => {
     const q = normalize(query);
     if (!q) return true;
     const termWords = normalize(e.term).split(" ");
@@ -1253,7 +1309,7 @@ function WiseApp() {
 
   // Whether the query matches an existing TERM specifically (ignores domain labels like
   // "Physics" or "Law" so a query that only overlaps a domain name doesn't block lookup).
-  const hasTermMatch = entries.some((e) => {
+  const hasTermMatch = allEntries.some((e) => {
     const q = normalize(query);
     if (!q) return true;
     const termWords = normalize(e.term).split(" ");
@@ -1262,6 +1318,18 @@ function WiseApp() {
     const allWordsPrefixMatch = qWords.every((qw) => termWords.some((w) => w.startsWith(qw)));
     return containsAsSubstring || allWordsPrefixMatch;
   });
+
+  const shownResults = normalize(query)
+    ? filtered
+        .slice()
+        .sort((a, b) => rank(a, normalize(query)) - rank(b, normalize(query)) || a.term.localeCompare(b.term))
+        .slice(0, 30)
+    : filtered;
+
+  // Auto-open the definition when the search text is exactly one term.
+  useEffect(() => {
+    if (exactHit) setExpandedId(suggestions[0].id);
+  }, [exactHit, query]);
 
   const addEntry = (entry) => {
     setEntries((prev) => {
@@ -1364,13 +1432,22 @@ function WiseApp() {
 
         {tab === "browse" ? (
           <div>
-            <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+            <div style={{ position: "relative", display: "flex", gap: 6, marginBottom: 6 }}>
               <input
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => { setQuery(e.target.value); setSuggestOpen(true); setActiveSuggest(-1); }}
+                onFocus={() => setSuggestOpen(true)}
+                onBlur={() => setTimeout(() => setSuggestOpen(false), 150)}
                 onKeyDown={(e) => {
+                  const open = suggestOpen && suggestions.length > 0 && !exactHit;
+                  if (open && e.key === "ArrowDown") { e.preventDefault(); setActiveSuggest((i) => Math.min(i + 1, suggestions.length - 1)); return; }
+                  if (open && e.key === "ArrowUp") { e.preventDefault(); setActiveSuggest((i) => Math.max(i - 1, 0)); return; }
+                  if (open && e.key === "Enter" && activeSuggest >= 0) { e.preventDefault(); pickSuggestion(suggestions[activeSuggest]); return; }
+                  if (e.key === "Escape") { setSuggestOpen(false); return; }
                   if (e.key === "Enter" && !hasTermMatch) lookupAndFilter();
                 }}
+                aria-autocomplete="list"
+                autoComplete="off"
                 placeholder="Search, or type a new term to define..."
                 style={{
                   flex: 1,
@@ -1385,7 +1462,43 @@ function WiseApp() {
                   color: INK,
                 }}
               />
+              {suggestOpen && suggestions.length > 0 && !exactHit && (
+                <div
+                  role="listbox"
+                  style={{
+                    position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50, marginTop: 2,
+                    background: "#FFFFFF", border: `1px solid ${RULE}`, borderRadius: 4,
+                    boxShadow: "0 6px 18px rgba(20,22,28,0.12)", overflow: "hidden",
+                  }}
+                >
+                  {suggestions.map((s, i) => (
+                    <div
+                      key={s.id}
+                      role="option"
+                      aria-selected={i === activeSuggest}
+                      onMouseDown={(ev) => { ev.preventDefault(); pickSuggestion(s); }}
+                      onMouseEnter={() => setActiveSuggest(i)}
+                      style={{
+                        display: "flex", justifyContent: "space-between", gap: 10, alignItems: "baseline",
+                        padding: "9px 12px", cursor: "pointer",
+                        background: i === activeSuggest ? "#F1EEE4" : "transparent",
+                        borderBottom: i < suggestions.length - 1 ? `1px solid ${RULE}` : "none",
+                      }}
+                    >
+                      <span style={{ fontFamily: "ui-serif, Georgia, serif", fontSize: 15, color: INK }}>{s.term}</span>
+                      <span style={{ fontFamily: "ui-sans-serif, system-ui", fontSize: 11, color: NAVY, whiteSpace: "nowrap" }}>{s.domain}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
+
+            {!query.trim() && library.length > 0 && (
+              <p style={{ fontFamily: "ui-sans-serif, system-ui", fontSize: 12, color: NAVY, margin: "4px 0 6px" }}>
+                Plus {library.length} saved STEM terms, ready to search ·{" "}
+                <a href="terms/" style={{ color: CRIMSON }}>browse STEM 333</a>
+              </p>
+            )}
 
             {!hasTermMatch && query.trim() && (
               <div style={{ marginTop: 8, marginBottom: 14 }}>
@@ -1424,11 +1537,11 @@ function WiseApp() {
               </div>
             )}
 
-            {filtered.map((entry) => (
+            {shownResults.map((entry) => (
               <EntryCard
                 key={entry.id}
                 entry={entry}
-                entries={entries}
+                entries={allEntries}
                 expanded={expandedId === entry.id}
                 onToggle={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
               />

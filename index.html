@@ -1240,8 +1240,10 @@ function WiseApp() {
 
   // Saved STEM 333 library: defined by WiseDefine, stored with the app, free and instant.
   useEffect(() => {
-    fetch("library/stem.json")
-      .then((r) => (r.ok ? r.json() : null))
+    // Looks in library/stem.json first, then stem.json next to this page.
+    const load = (url) => fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+    load("library/stem.json")
+      .catch(() => load("stem.json"))
       .then((data) => { if (data && Array.isArray(data.entries)) setLibrary(data.entries); })
       .catch(() => {});
   }, []);

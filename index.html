@@ -54,16 +54,52 @@
 </div>
 
 <div id="upgrade-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
-  <div style="background:#F7F4EC; border-radius:6px; padding:28px; max-width:420px; width:90%; font-family:ui-sans-serif,system-ui;">
-    <div style="font-family:ui-serif,Georgia,serif; font-size:22px; font-weight:700; color:#14161C; margin-bottom:12px;">Upgrade to Pro</div>
-    <p style="font-size:14px; color:#2A2A2E; line-height:1.6; margin-bottom:14px;">
-      Pro gives you unlimited daily lookups, plus the ability to save and export definitions.
-    </p>
-    <p style="font-size:13px; color:#2A2A2E; margin-bottom:16px;">
-      One-time payment of $5.00 — unlocks Pro permanently, no recurring charge.
-    </p>
-    <button id="upgrade-modal-pay-btn" type="button" style="font-family: ui-sans-serif, system-ui; font-size: 14px; font-weight: 600; background: #3C6E4F; border: none; color: #fff; border-radius: 3px; padding: 10px 16px; cursor: pointer; width:100%; margin-bottom:10px;">Pay with Dodo ($5.00)</button>
-    <button id="upgrade-modal-close-btn" type="button" style="font-family: ui-sans-serif, system-ui; font-size: 13px; font-weight: 600; background: #14161C; border: none; color: #fff; border-radius: 3px; padding: 8px 16px; cursor: pointer; width:100%;">Close</button>
+  <div style="background:#F7F4EC; border-radius:6px; padding:24px; max-width:430px; width:92%; max-height:92vh; overflow-y:auto; font-family:ui-sans-serif,system-ui; color:#14161C;">
+    <div style="font-family:ui-serif,Georgia,serif; font-size:22px; font-weight:700; margin-bottom:8px;">Upgrade to Pro</div>
+    <p style="font-size:14px; color:#2A2A2E; line-height:1.55; margin:0 0 14px;">Unlimited daily lookups, plus saving and exporting definitions.</p>
+
+    <div id="upgrade-plans">
+      <button id="plan-month-btn" type="button" style="font-family:ui-sans-serif,system-ui; font-size:14px; font-weight:600; border:none; border-radius:4px; padding:11px 14px; cursor:pointer; width:100%; background:#3C6E4F; color:#fff; margin-bottom:8px;">Monthly — $3 for 1 month</button>
+      <button id="plan-year-btn" type="button" style="font-family:ui-sans-serif,system-ui; font-size:14px; font-weight:600; border:none; border-radius:4px; padding:11px 14px; cursor:pointer; width:100%; background:#0B1D45; color:#fff; margin-bottom:4px;">Yearly — $25 for 12 months <span style="color:#FFD54F;">(save 30%)</span></button>
+      <p style="font-size:12px; color:#555; margin:4px 0 14px;">One-time payment by card. No automatic renewal — you choose whether to extend.</p>
+
+      <div style="border-top:1px solid #dcd8cc; padding-top:12px; margin-bottom:12px;">
+        <div style="font-weight:700; font-size:14px; margin-bottom:4px;">Can't pay by card? Make a deal.</div>
+        <p style="font-size:13px; color:#2A2A2E; margin:0 0 8px;">Pay by TeleBirr, CBE Birr, bank, cash, or through your institution. Send a request and we'll contact you.</p>
+        <button id="deal-open-btn" type="button" style="font-family:ui-sans-serif,system-ui; font-size:14px; font-weight:600; border:none; border-radius:4px; padding:11px 14px; cursor:pointer; width:100%; background:#fff; color:#14161C; border:1px solid #14161C;">Request a flexible payment</button>
+      </div>
+    </div>
+
+    <div id="deal-form" style="display:none;">
+      <div style="font-weight:700; font-size:15px; margin-bottom:8px;">Flexible payment request</div>
+      <label style="font-size:12px; font-weight:600;">Your name</label>
+      <input id="deal-name" type="text" maxlength="120" style="width:100%; box-sizing:border-box; margin:3px 0 9px; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:14px; background:#fff;" />
+      <label style="font-size:12px; font-weight:600;">Phone or Telegram (so we can reach you)</label>
+      <input id="deal-contact" type="text" maxlength="120" style="width:100%; box-sizing:border-box; margin:3px 0 9px; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:14px; background:#fff;" />
+      <label style="font-size:12px; font-weight:600;">How you'd like to pay</label>
+      <select id="deal-method" style="width:100%; box-sizing:border-box; margin:3px 0 9px; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:14px; background:#fff;">
+        <option value="telebirr">TeleBirr</option>
+        <option value="cbe_birr">CBE Birr</option>
+        <option value="bank">Bank transfer</option>
+        <option value="cash">Cash</option>
+        <option value="institution">Through my school / institution</option>
+        <option value="other">Other</option>
+      </select>
+      <label style="font-size:12px; font-weight:600;">What you need</label>
+      <select id="deal-plan" style="width:100%; box-sizing:border-box; margin:3px 0 9px; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:14px; background:#fff;">
+        <option value="month">1 month</option>
+        <option value="year">12 months</option>
+        <option value="custom">A different period</option>
+        <option value="institution">A group / institutional deal</option>
+      </select>
+      <label style="font-size:12px; font-weight:600;">Anything else (optional)</label>
+      <textarea id="deal-message" rows="3" maxlength="1000" style="width:100%; box-sizing:border-box; margin:3px 0 9px; padding:8px; border:1px solid #ccc; border-radius:4px; font-size:14px; background:#fff; font-family:inherit; resize:vertical;"></textarea>
+      <div id="deal-status" style="font-size:13px; min-height:18px; margin-bottom:8px;"></div>
+      <button id="deal-send-btn" type="button" style="font-family:ui-sans-serif,system-ui; font-size:14px; font-weight:600; border:none; border-radius:4px; padding:11px 14px; cursor:pointer; width:100%; background:#3C6E4F; color:#fff; margin-bottom:8px;">Send request</button>
+      <button id="deal-back-btn" type="button" style="font-family:ui-sans-serif,system-ui; font-size:14px; font-weight:600; border:none; border-radius:4px; padding:11px 14px; cursor:pointer; width:100%; background:#fff; color:#14161C; border:1px solid #ccc; margin-bottom:8px;">Back to plans</button>
+    </div>
+
+    <button id="upgrade-modal-close-btn" type="button" style="font-family:ui-sans-serif,system-ui; font-size:14px; font-weight:600; border:none; border-radius:4px; padding:11px 14px; cursor:pointer; width:100%; background:#14161C; color:#fff; font-size:13px; padding:9px 14px;">Close</button>
   </div>
 </div>
 
@@ -113,11 +149,14 @@
         var remaining = Math.max(0, 5 - usedToday);
         quotaEl.textContent = " (" + remaining + "/5 lookups left today)";
         upgradeBtn.style.display = "inline-block";
+        upgradeBtn.textContent = "Upgrade to Pro";
       } else {
         quotaEl.textContent = window.__wiseProUntil__
           ? " (unlimited until " + window.__wiseProUntil__ + ")"
           : " (unlimited)";
-        upgradeBtn.style.display = "none";
+        // Time-limited Pro can be extended; lifetime Pro needs nothing.
+        upgradeBtn.style.display = window.__wiseProUntil__ ? "inline-block" : "none";
+        upgradeBtn.textContent = "Extend Pro";
       }
     } else {
       signedOut.style.display = "inline-flex";
@@ -129,29 +168,75 @@
     }
   }
 
-  var DODO_PRODUCT_ID = "pdt_0NoXbsm4Z0VtJtGQkHfYy";
+  // Dodo product IDs for the two plans. Paste each ID here after creating the
+  // products in your Dodo dashboard. While an ID is empty, its button says "coming soon".
+  var DODO_MONTHLY_ID = "";
+  var DODO_YEARLY_ID = "";
 
-  document.getElementById("account-upgrade-btn").addEventListener("click", function () {
-    document.getElementById("upgrade-modal").style.display = "flex";
+  function upgradeModalShow(show) {
+    document.getElementById("upgrade-modal").style.display = show ? "flex" : "none";
+    document.getElementById("upgrade-plans").style.display = "block";
+    document.getElementById("deal-form").style.display = "none";
+  }
+  window.__wiseShowUpgrade__ = function () { upgradeModalShow(true); };
+
+  [["plan-month-btn", DODO_MONTHLY_ID], ["plan-year-btn", DODO_YEARLY_ID]].forEach(function (pair) {
+    var btn = document.getElementById(pair[0]);
+    if (!pair[1]) { btn.disabled = true; btn.style.opacity = "0.55"; btn.style.cursor = "default"; btn.innerHTML += " — coming soon"; }
+    btn.addEventListener("click", function () {
+      if (!pair[1]) return;
+      if (!window.__wiseUser__) {
+        accSetMsg("Please sign in first before upgrading.", true);
+        upgradeModalShow(false);
+        return;
+      }
+      var email = encodeURIComponent(window.__wiseUser__.email || "");
+      var userId = encodeURIComponent(window.__wiseUser__.id || "");
+      var redirectUrl = encodeURIComponent(window.location.origin + window.location.pathname);
+      window.location.href =
+        "https://checkout.dodopayments.com/buy/" + pair[1] +
+        "?quantity=1&email=" + email + "&disableEmail=true" +
+        "&metadata_supabase_user_id=" + userId +
+        "&redirect_url=" + redirectUrl;
+    });
   });
-  document.getElementById("upgrade-modal-close-btn").addEventListener("click", function () {
-    document.getElementById("upgrade-modal").style.display = "none";
-  });
-  document.getElementById("upgrade-modal-pay-btn").addEventListener("click", function () {
+
+  document.getElementById("account-upgrade-btn").addEventListener("click", function () { upgradeModalShow(true); });
+  document.getElementById("upgrade-modal-close-btn").addEventListener("click", function () { upgradeModalShow(false); });
+
+  document.getElementById("deal-open-btn").addEventListener("click", function () {
     if (!window.__wiseUser__) {
-      accSetMsg("Please sign in first before upgrading.", true);
-      document.getElementById("upgrade-modal").style.display = "none";
+      accSetMsg("Please sign up or sign in first, so Pro can be added to your account.", true);
+      upgradeModalShow(false);
       return;
     }
-    var email = encodeURIComponent(window.__wiseUser__.email || "");
-    var userId = encodeURIComponent(window.__wiseUser__.id || "");
-    var redirectUrl = encodeURIComponent(window.location.origin + window.location.pathname);
-    var payLink =
-      "https://checkout.dodopayments.com/buy/" + DODO_PRODUCT_ID +
-      "?quantity=1&email=" + email + "&disableEmail=true" +
-      "&metadata_supabase_user_id=" + userId +
-      "&redirect_url=" + redirectUrl;
-    window.location.href = payLink;
+    document.getElementById("upgrade-plans").style.display = "none";
+    document.getElementById("deal-form").style.display = "block";
+    document.getElementById("deal-status").textContent = "";
+  });
+  document.getElementById("deal-back-btn").addEventListener("click", function () {
+    document.getElementById("upgrade-plans").style.display = "block";
+    document.getElementById("deal-form").style.display = "none";
+  });
+  document.getElementById("deal-send-btn").addEventListener("click", async function () {
+    var st = document.getElementById("deal-status");
+    var contact = document.getElementById("deal-contact").value.trim();
+    if (!contact) { st.style.color = "#A6363C"; st.textContent = "Please give a phone number or Telegram so we can reach you."; return; }
+    if (!wiseSupabase || !window.__wiseUser__) { st.style.color = "#A6363C"; st.textContent = "Please sign in first."; return; }
+    this.disabled = true; st.style.color = "#3C6E4F"; st.textContent = "Sending…";
+    var r = await wiseSupabase.from("payment_requests").insert({
+      email: window.__wiseUser__.email || null,
+      name: document.getElementById("deal-name").value.trim() || null,
+      contact: contact,
+      method: document.getElementById("deal-method").value,
+      plan_wanted: document.getElementById("deal-plan").value,
+      message: document.getElementById("deal-message").value.trim() || null
+    });
+    this.disabled = false;
+    if (r.error) { st.style.color = "#A6363C"; st.textContent = "Sorry, it couldn't be sent. Please try again later."; return; }
+    st.style.color = "#3C6E4F";
+    st.textContent = "Thank you — your request was sent. We'll contact you soon.";
+    document.getElementById("deal-message").value = "";
   });
 
   async function accFetchProfile(userId) {
@@ -862,8 +947,7 @@ async function callSharedBackend(system, userContent) {
       window.__wiseLookupsToday__ = 5;
       window.__wiseLookupDate__ = window.__wiseToday__();
       if (typeof accUpdateUI === "function") accUpdateUI();
-      const modal = document.getElementById("upgrade-modal");
-      if (modal) modal.style.display = "flex";
+      if (window.__wiseShowUpgrade__) window.__wiseShowUpgrade__();
       throw new Error(
         (errJson && errJson.message) ||
         "You've used your 5 free lookups today. Upgrade to Pro for unlimited lookups, or come back tomorrow."

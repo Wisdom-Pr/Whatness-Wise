@@ -1243,7 +1243,7 @@ function WiseApp() {
     // Saved collections, each a JSON file next to this page (STEM 333; Business, Administration and Law).
     // A missing file is skipped, so the others still load.
     const load = (url) => fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
-    const files = [["stem.json", "library/stem.json"], ["bal.json"]];
+    const files = [["stem.json", "library/stem.json"], ["bal.json"], ["hw.json"]];
     Promise.all(
       files.map(([first, second]) =>
         load(first)
@@ -1277,18 +1277,20 @@ function WiseApp() {
     return [...entries, ...library.filter((e) => !have.has(e.id))];
   }, [entries, library]);
 
-  const termMatches = (e, q) => {
-    const termWords = normalize(e.term).split(" ");
-    const qWords = q.split(" ");
-    return normalize(e.term).includes(q) || qWords.every((qw) => termWords.some((w) => w.startsWith(qw)));
+  // A term can also be found by its other names (e.g. "ADHD", "flu").
+  const names = (e) => [e.term, ...(Array.isArray(e.aliases) ? e.aliases : [])].map(normalize);
+  const nameMatches = (n, q) => {
+    const words = n.split(" ");
+    return n.includes(q) || q.split(" ").every((qw) => words.some((w) => w.startsWith(qw)));
   };
-  const rank = (e, q) => {
-    const t = normalize(e.term);
+  const termMatches = (e, q) => names(e).some((n) => nameMatches(n, q));
+  const rankName = (t, q) => {
     if (t === q) return 0;
     if (t.startsWith(q)) return 1;
     if (t.split(" ").some((w) => w.startsWith(q))) return 2;
     return 3;
   };
+  const rank = (e, q) => Math.min(...names(e).map((t) => rankName(t, q)));
 
   const suggestions = (() => {
     const q = normalize(query);
@@ -1298,7 +1300,7 @@ function WiseApp() {
       .sort((a, b) => rank(a, q) - rank(b, q) || a.term.localeCompare(b.term))
       .slice(0, 8);
   })();
-  const exactHit = suggestions.length > 0 && normalize(suggestions[0].term) === normalize(query);
+  const exactHit = suggestions.length > 0 && names(suggestions[0]).includes(normalize(query));
 
   const pickSuggestion = (e) => {
     setQuery(e.term);
@@ -1311,11 +1313,11 @@ function WiseApp() {
   const filtered = searchPool.filter((e) => {
     const q = normalize(query);
     if (!q) return true;
+    if (termMatches(e, q)) return true;
     const termWords = normalize(e.term).split(" ");
     const domainWords = normalize(e.domain).split(" ");
     const qWords = q.split(" ");
-    const containsAsSubstring =
-      normalize(e.term).includes(q) || normalize(e.domain).includes(q);
+    const containsAsSubstring = normalize(e.domain).includes(q);
     const allWordsPrefixMatch = qWords.every((qw) =>
       [...termWords, ...domainWords].some((w) => w.startsWith(qw))
     );
@@ -1327,11 +1329,7 @@ function WiseApp() {
   const hasTermMatch = allEntries.some((e) => {
     const q = normalize(query);
     if (!q) return true;
-    const termWords = normalize(e.term).split(" ");
-    const qWords = q.split(" ");
-    const containsAsSubstring = normalize(e.term).includes(q);
-    const allWordsPrefixMatch = qWords.every((qw) => termWords.some((w) => w.startsWith(qw)));
-    return containsAsSubstring || allWordsPrefixMatch;
+    return termMatches(e, q);
   });
 
   const shownResults = normalize(query)

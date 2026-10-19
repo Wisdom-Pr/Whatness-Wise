@@ -446,8 +446,12 @@ async function fetchLibFile(url) {
 async function loadBatch() {
   for (var i = 0; i < BCOLLS.length; i++) {
     var c = BCOLLS[i];
-    for (var j = 0; j < c.files.length && !B.lib[c.key]; j++) {
-      try { B.lib[c.key] = await fetchLibFile(c.files[j]); } catch (e) {}
+    for (var attempt = 0; attempt < 3 && !B.lib[c.key]; attempt++) {
+      if (attempt) await bsleep(1500);
+      for (var j = 0; j < c.files.length && !B.lib[c.key]; j++) {
+        try { B.lib[c.key] = await fetchLibFile(c.files[j]); } catch (e) {}
+      }
+      if (c.list) break;  // new rounds have their list built in
     }
     if (c.list) {
       // Lay any published definitions over the full term list.
@@ -679,9 +683,15 @@ async function batchStart() {
   }
 }
 
-function exportColl(key) {
+async function exportColl(key) {
   var d = B.lib[key];
-  if (!d) { alert("That library file couldn't be loaded."); return; }
+  if (!d) {
+    var c = BCOLLS.find(function (x) { return x.key === key; });
+    for (var j = 0; c && j < c.files.length && !d; j++) {
+      try { d = B.lib[key] = await fetchLibFile(c.files[j]); } catch (e) {}
+    }
+  }
+  if (!d) { alert("That library file couldn't be loaded. Check your connection, then reload this page (Ctrl+F5) and try again."); return; }
   var withDone = bel("b-exp-done").checked;
   var copy = JSON.parse(JSON.stringify(d)), n = 0;
   copy.entries.forEach(function (e) {

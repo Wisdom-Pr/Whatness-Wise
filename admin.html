@@ -51,6 +51,7 @@
   <img src="icon-192.png" alt="" />
   <h1>WiseDefine — Admin</h1>
   <div class="who" id="who"></div>
+  <button id="signout" style="display:none;margin-left:10px">Sign out</button>
 </header>
 
 <main id="app">
@@ -76,21 +77,34 @@ async function start() {
     return;
   }
   document.getElementById("who").textContent = user.email;
+  var so = document.getElementById("signout");
+  so.style.display = "inline-block";
+  so.onclick = async function () { await sb.auth.signOut(); location.href = "./"; };
   var adm = await sb.rpc("is_admin");
   if (adm.error || adm.data !== true) {
-    app.innerHTML = '<div class="notice">This page is private.</div>';
+    app.innerHTML = '<div class="notice">This page is private. You are signed in as <strong>' + esc(user.email) + '</strong>, which is not an admin account.<br><br><button class="dark" id="switch-acc">Sign out and switch account</button></div>';
+    document.getElementById("switch-acc").onclick = async function () { await sb.auth.signOut(); location.href = "./"; };
     return;
   }
   renderShell();
-  loadStats(); loadAccounts(); loadDefs(); loadSwitch(); loadFeedback(); loadWords(); loadBlocked();
+  loadStats(); loadRequests(); loadAccounts(); loadDefs(); loadSwitch(); loadFeedback(); loadWords(); loadBlocked(); loadBatch();
 }
 
 function renderShell() {
   app.innerHTML =
     '<h2>Overview</h2><div class="cards" id="cards">Loading…</div>' +
     '<h2>Last 14 days</h2><div class="panel"><table id="daily"></table></div>' +
+    '<h2>Grant or extend Pro</h2><div class="panel">' +
+      '<p style="font-size:13px;margin-top:0">For people who paid you another way (TeleBirr, cash, institution…). Time is added after any Pro time they already have. Lifetime accounts are never shortened.</p>' +
+      '<div class="row" style="margin-bottom:8px"><input type="text" id="g-email" placeholder="account email" style="min-width:230px" />' +
+      '<select id="g-kind"><option value="1">1 month</option><option value="12">12 months</option><option value="m">Custom months</option><option value="d">Until a date</option><option value="life">Lifetime</option></select>' +
+      '<input type="text" id="g-extra" placeholder="" style="display:none;width:130px" />' +
+      '<button class="primary" id="g-go">Grant</button><button class="danger" id="g-revoke">Set back to Free</button></div>' +
+      '<div class="msgline" id="g-msg"></div></div>' +
+    '<h2>Flexible payment requests</h2><div class="panel"><div class="row" style="margin-bottom:8px"><select id="pr-filter"><option value="open">Open (new + contacted)</option><option value="granted">Granted</option><option value="declined">Declined</option><option value="all">All</option></select></div><div id="pr-list">Loading…</div></div>' +
     '<h2>Accounts</h2><div class="panel"><div class="row" style="margin-bottom:8px"><input type="text" id="acc-q" placeholder="search email" /><span id="acc-count" style="font-size:12px;color:#6b6b72"></span></div><div style="overflow-x:auto"><table id="acc"></table></div></div>' +
     '<h2>Saved definitions</h2><div class="panel"><div class="row" style="margin-bottom:8px"><input type="text" id="def-q" placeholder="search text" /><span id="def-count" style="font-size:12px;color:#6b6b72"></span></div><div id="defs">Loading…</div></div>' +
+    batchSectionHtml() +
     '<h2>Feedback</h2>' +
     '<div class="panel" style="margin-bottom:12px"><div class="switch"><strong>Feedback button on the site:</strong> <span id="sw-state">…</span> <button id="sw-btn" class="dark">…</button></div><div class="msgline" id="sw-msg"></div></div>' +
     '<div class="row" style="margin-bottom:10px">' +
@@ -108,7 +122,16 @@ function renderShell() {
   document.getElementById("f-refresh").onclick = function () { loadStats(); loadAccounts(); loadDefs(); loadFeedback(); };
   document.getElementById("w-add").onclick = addWord;
   document.getElementById("acc-q").oninput = renderAccounts;
+  document.getElementById("g-kind").onchange = function () {
+    var x = document.getElementById("g-extra");
+    x.style.display = (this.value === "m" || this.value === "d") ? "inline-block" : "none";
+    x.placeholder = this.value === "m" ? "months, e.g. 36" : "YYYY-MM-DD";
+  };
+  document.getElementById("g-go").onclick = grantPro;
+  document.getElementById("g-revoke").onclick = revokePro;
+  document.getElementById("pr-filter").onchange = loadRequests;
   document.getElementById("def-q").oninput = renderDefs;
+  wireBatch();
 }
 
 async function loadStats() {
@@ -185,6 +208,75 @@ function renderDefs() {
       var r = await sb.rpc("admin_delete_definition", { p_key: b.dataset.k });
       if (r.error) alert("Couldn't delete: " + r.error.message);
       loadDefs(); loadStats();
+    };
+  });
+}
+
+async function grantPro() {
+  var email = document.getElementById("g-email").value.trim();
+  var kind = document.getElementById("g-kind").value;
+  var extra = document.getElementById("g-extra").value.trim();
+  var msg = document.getElementById("g-msg");
+  if (!email) { msg.textContent = "Enter the account email."; return; }
+  var args = { p_email: email, p_months: null, p_until: null, p_lifetime: false };
+  if (kind === "1" || kind === "12") args.p_months = Number(kind);
+  else if (kind === "m") { args.p_months = parseInt(extra, 10); if (!(args.p_months > 0)) { msg.textContent = "Enter a number of months."; return; } }
+  else if (kind === "d") { if (!/^\d{4}-\d{2}-\d{2}$/.test(extra)) { msg.textContent = "Enter the date as YYYY-MM-DD."; return; } args.p_until = extra; }
+  else if (kind === "life") { if (!confirm("Give " + email + " lifetime Pro?")) return; args.p_lifetime = true; }
+  var r = await sb.rpc("admin_grant_pro", args);
+  msg.textContent = r.error ? ("Couldn't grant: " + r.error.message) : (r.data && r.data.message);
+  if (!r.error && r.data && r.data.ok && window.__pendingRequestId) {
+    await sb.from("payment_requests").update({ status: "granted" }).eq("id", window.__pendingRequestId);
+    window.__pendingRequestId = null; loadRequests();
+  }
+  loadAccounts(); loadStats();
+}
+
+async function revokePro() {
+  var email = document.getElementById("g-email").value.trim();
+  var msg = document.getElementById("g-msg");
+  if (!email) { msg.textContent = "Enter the account email."; return; }
+  if (!confirm("Set " + email + " back to Free?")) return;
+  var r = await sb.rpc("admin_revoke_pro", { p_email: email });
+  msg.textContent = r.error ? ("Couldn't change: " + r.error.message) : (r.data && r.data.message);
+  loadAccounts(); loadStats();
+}
+
+var METHOD = { telebirr: "TeleBirr", cbe_birr: "CBE Birr", bank: "Bank", cash: "Cash", institution: "Institution", other: "Other" };
+var WANT = { month: "1 month", year: "12 months", custom: "different period", institution: "institutional deal" };
+
+async function loadRequests() {
+  var f = document.getElementById("pr-filter").value;
+  var q = sb.from("payment_requests").select("*").order("created_at", { ascending: false }).limit(200);
+  if (f === "open") q = q.in("status", ["new", "contacted"]);
+  else if (f !== "all") q = q.eq("status", f);
+  var r = await q;
+  var box = document.getElementById("pr-list");
+  if (r.error) { box.textContent = "Couldn't load requests: " + r.error.message; return; }
+  if (!r.data.length) { box.innerHTML = '<p style="font-size:13px;color:#6b6b72;margin:0">No requests here.</p>'; return; }
+  box.innerHTML = r.data.map(function (x) {
+    return '<div class="fb"><div class="meta">' + esc(fmt(x.created_at)) + ' · ' + esc(x.email || "") + '</div>' +
+      '<div style="margin-bottom:6px"><span class="tag">' + esc(METHOD[x.method] || x.method) + '</span><span class="tag">' + esc(WANT[x.plan_wanted] || x.plan_wanted) + '</span><span class="tag ' + (x.status === "new" ? "new" : "") + '">' + esc(x.status) + '</span></div>' +
+      '<div class="msg"><strong>' + esc(x.name || "(no name)") + '</strong> — ' + esc(x.contact || "") + (x.message ? "\n" + esc(x.message) : "") + '</div>' +
+      '<div class="row">' +
+        '<button data-p="contacted" data-id="' + x.id + '">Mark contacted</button>' +
+        '<button class="primary" data-g="' + esc(x.email || "") + '" data-id="' + x.id + '">Grant Pro…</button>' +
+        '<button data-p="declined" data-id="' + x.id + '">Decline</button>' +
+        '<button class="danger" data-del="' + x.id + '">Delete</button>' +
+      '</div></div>';
+  }).join("");
+  box.querySelectorAll("button[data-p]").forEach(function (b) {
+    b.onclick = async function () { await sb.from("payment_requests").update({ status: b.dataset.p }).eq("id", Number(b.dataset.id)); loadRequests(); };
+  });
+  box.querySelectorAll("button[data-del]").forEach(function (b) {
+    b.onclick = async function () { if (!confirm("Delete this request?")) return; await sb.from("payment_requests").delete().eq("id", Number(b.dataset.del)); loadRequests(); };
+  });
+  box.querySelectorAll("button[data-g]").forEach(function (b) {
+    b.onclick = function () {
+      document.getElementById("g-email").value = b.dataset.g;
+      document.getElementById("g-msg").textContent = "Choose the period above and click Grant. Then mark the request as granted.";
+      window.__pendingRequestId = Number(b.dataset.id);
+      document.getElementById("g-email").scrollIntoView({ behavior: "smooth", block: "center" });
     };
   });
 }
@@ -281,6 +373,318 @@ async function loadBlocked() {
   box.querySelectorAll("button[data-u]").forEach(function (b) {
     b.onclick = async function () { await sb.from("blocked_senders").delete().eq("id", Number(b.dataset.u)); loadBlocked(); };
   });
+}
+
+// ===================== Batch define =====================
+// Sends every library term through the real WiseDefine engine (the same
+// filter-definition function and the same instructions the app uses),
+// one at a time, saving progress so it can stop and continue another day.
+var LOOKUP_SYSTEM_PROMPT = "You are the definition-filtering engine inside an academic dictionary app called WiseDefine. A student has typed a single term into the search box. You know the standard/textbook definition of this term from general knowledge. Your job:\n\n1. Recall the standard, commonly-known definition of the term (the one \"everyone knows so far\").\n2. Run that standard definition through the app's 7 Definition-Filtering Rules:\n   1. Find the WHAT (what the concept fundamentally is)\n   2. Separate WHAT from CONDITION (don't let a qualifying condition pose as the definition)\n   3. Identify the mechanism (how it produces/achieves its function)\n   4. Identify the result (what it produces, determines, represents, or affects)\n   5. Test discrimination (could this definition describe another concept? if yes, it's weak)\n   6. Test circularity (does it just repeat the term itself?)\n   7. Test completeness (enough to distinguish it, without becoming a paragraph)\n\nCRITICAL — the most common textbook phrasing is very often too generic to pass Rule 5, precisely because it's the phrasing everyone repeats without checking it. Example: \"Energy is the capacity to do work\" fails Rule 5 because it could equally describe force or power. The fix is not to reword that sentence — it's to find the one fact that is uniquely true of THIS concept and not of its closest neighbors: for energy, that's the conservation law (\"cannot be created or destroyed\"). Actively search for a conservation law, an invariant, a defining formula, a unique unit, or a structural property that only this term has, and use THAT as the discriminating clause, even if the most common phrasing of the term omits it. Do not output a definition that could be defended as \"technically what's usually said\" if it still fails your own discrimination test.\n\nCRITICAL — cross-domain completeness. A term's most common definition often comes from just one field (usually physics) and can be too narrow once the term is also used in engineering, social science, or another discipline this dictionary covers. Example: \"Force is a push or pull that changes an object's motion\" is a physics-only definition. It misses that in structural engineering, force also produces deformation in objects that never move at all (a loaded column in static equilibrium). The corrected version must cover every discipline the term is actually used in: \"Force is a push or pull one object exerts on another, changing its state of motion or its structural form.\" Before finalizing, ask: is this term used in more than one field, and does my definition only account for one of them?\n\nCRITICAL — family-member discrimination. Some concepts belong to a tight family of near-neighbors that a generic definition accidentally covers all of. Example: \"a push or pull that changes structural form\" alone doesn't distinguish force from pressure or stress, since those also deform matter — the real difference is that force acts as a whole, while pressure and stress are force normalized by area. When a term has such neighbors, add the scoping word that excludes them (e.g., \"as a whole,\" \"at a point,\" \"per unit area\") rather than assuming the base definition already does.\n\nCRITICAL — canonical terminology. Use the exact standard term-of-art a trained practitioner would use, not a near-synonym that sounds slightly off (e.g., write \"state of motion,\" not \"status of motion\"). A definition can be structurally sound and still undercut the app's academic standard through one wrong word.\n\nCRITICAL — self-synonym circularity. Rule 6 also catches defining a term using a grammatical cousin of itself. Example: \"Speed measures how fast an object moves\" defines speed using \"fast\" — the adjective form of speed itself. This looks non-circular because the words differ, but it's the same failure as restating the term. Check every content word in your final definition against the term: if any word is a synonym, adjective form, or colloquial stand-in for the term, replace it with the actual measurable relationship.\n\nCRITICAL — ratio/rate completeness. If the term is a rate, ratio, or measured quantity (speed, density, pressure, momentum, acceleration, etc.), the definition must name BOTH quantities in the defining relationship, not just one. Example: \"Speed measures how much distance an object covers\" is incomplete — it drops time. The corrected form is \"Speed is a scalar quantity that measures how much distance an object covers in a given time.\" Before finalizing a rate/ratio term, check that both halves of the relationship are named.\n\nCRITICAL — concision and directness. Even a definition with the right facts can read as heavy if the phrasing is roundabout. Watch for repeated quantifiers (\"all... all\") and indirect verbs standing in for a direct relationship (\"standards that measure laws\" instead of \"laws must meet the standard\"). Example: \"the binding standards that measure all other laws and government actions\" tightens to \"the standard all other laws must meet\" — same fact, fewer words, easier to read aloud. Keep every discriminating fact, but state it as directly as possible.\n\n3. Extract four fields: category, identity, mechanism, problem (the discrimination/circularity/condition weakness you found in the standard definition; if none, say \"None\").\n4. Rewrite the definition as ONE plain sentence in the pattern \"[Term] is the/a [core WHAT] ... that/exercised through/produced by [discriminating mechanism].\" Use vocabulary a first-time student already knows — no jargon that itself needs defining. One sentence only.\n5. Also classify the term's domain in a couple of words (e.g. \"Structural Engineering\", \"Social Science\", \"Physics\", \"Biology\"). If it applies to more than one, name the discipline whose usage your final sentence covers most completely.\n\nIf the term is not a real, recognizable academic word, phrase, or clause, respond with exactly: {\"error\":\"not_found\"}\n\nOtherwise respond with ONLY minified JSON, no markdown fences, no preamble, in exactly this shape:\n{\"domain\":\"...\",\"standard\":\"...\",\"category\":\"...\",\"identity\":\"...\",\"mechanism\":\"...\",\"problem\":\"...\",\"definition\":\"...\"}";
+var BCOLLS = [
+  { key: "stem", files: ["stem.json", "library/stem.json"], label: "STEM" },
+  { key: "bal", files: ["bal.json"], label: "Business, Administration and Law" }
+];
+var B = { lib: {}, rows: {}, order: [], running: false, shown: 40, wakeAt: 0 };
+
+function bel(id) { return document.getElementById(id); }
+function bsleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+function batchSectionHtml() {
+  return '<h2>Batch define</h2><div class="panel" id="batch">' +
+    '<p style="font-size:13px;margin-top:0">Sends every library term through WiseDefine\'s own engine, one by one. When the AI quota runs out it waits and carries on (keep this page open), or you press Start again another day — finished terms are remembered. Review the new definitions, then export the library files.</p>' +
+    '<div class="cards" id="b-cards" style="margin-bottom:10px">Loading…</div>' +
+    '<div class="row" style="margin-bottom:6px">' +
+      '<button class="primary" id="b-start">Start</button><button id="b-pause" disabled>Pause</button>' +
+      '<label style="font-size:12px">Seconds between terms <input type="text" id="b-delay" value="13" style="width:50px" /></label>' +
+      '<label style="font-size:12px"><input type="checkbox" id="b-wait" checked /> When the quota runs out, wait and retry every 30 min</label>' +
+      '<label style="font-size:12px"><input type="checkbox" id="b-gemma" /> Also accept Gemma (last-resort model) answers</label>' +
+    '</div>' +
+    '<div class="msgline" id="b-line"></div>' +
+    '<h3 style="font-size:15px;margin:16px 0 8px">Review</h3>' +
+    '<div class="row" style="margin-bottom:8px">' +
+      '<select id="b-filter"><option value="done">To review</option><option value="approved">Approved</option><option value="rejected">Rejected (original kept)</option><option value="not_found">Not recognised</option><option value="failed">Failed</option><option value="pending">Not yet defined</option><option value="all">All</option></select>' +
+      '<select id="b-coll"><option value="all">Both collections</option><option value="stem">STEM</option><option value="bal">Business, Administration and Law</option></select>' +
+      '<input type="text" id="b-q" placeholder="search term" />' +
+      '<button id="b-approve-all">Approve all shown “to review”</button>' +
+      '<span id="b-count" style="font-size:12px;color:#6b6b72"></span>' +
+    '</div>' +
+    '<div id="b-list"></div>' +
+    '<h3 style="font-size:15px;margin:16px 0 8px">Export</h3>' +
+    '<p style="font-size:13px;margin-top:0">Approved terms get WiseDefine\'s new definition and fields; every other term keeps its current text. Ids, pages and links never change.</p>' +
+    '<div class="row"><button class="dark" id="b-exp-stem">Download stem.json</button><button class="dark" id="b-exp-bal">Download bal.json</button>' +
+      '<label style="font-size:12px"><input type="checkbox" id="b-exp-done" /> Also include “to review” terms</label></div>' +
+    '<div class="msgline" id="b-exp-msg"></div>' +
+  '</div>';
+}
+
+function wireBatch() {
+  bel("b-start").onclick = batchStart;
+  bel("b-pause").onclick = batchPause;
+  bel("b-filter").onchange = function () { B.shown = 40; renderBatchList(); };
+  bel("b-coll").onchange = function () { B.shown = 40; renderBatchList(); };
+  bel("b-q").oninput = function () { B.shown = 40; renderBatchList(); };
+  bel("b-approve-all").onclick = approveAllShown;
+  bel("b-exp-stem").onclick = function () { exportColl("stem"); };
+  bel("b-exp-bal").onclick = function () { exportColl("bal"); };
+}
+
+async function fetchLibFile(url) {
+  var r = await fetch(url + "?v=" + Date.now(), { cache: "no-store" });
+  if (!r.ok) throw new Error(url + " " + r.status);
+  return r.json();
+}
+
+async function loadBatch() {
+  for (var i = 0; i < BCOLLS.length; i++) {
+    var c = BCOLLS[i];
+    for (var j = 0; j < c.files.length && !B.lib[c.key]; j++) {
+      try { B.lib[c.key] = await fetchLibFile(c.files[j]); } catch (e) {}
+    }
+  }
+  B.order = [];
+  BCOLLS.forEach(function (c) {
+    var d = B.lib[c.key];
+    if (!d || !Array.isArray(d.entries)) return;
+    d.entries.forEach(function (e) { B.order.push({ id: c.key + ":" + e.id, coll: c.key, entry: e }); });
+  });
+  B.rows = {};
+  for (var from = 0; ; from += 1000) {
+    var r = await sb.from("batch_definitions").select("*").range(from, from + 999);
+    if (r.error) {
+      bel("b-cards").innerHTML = '<div style="font-size:13px;color:#A6363C">Run batch-setup in the Supabase SQL Editor first. (' + esc(r.error.message) + ')</div>';
+      bel("b-start").disabled = true;
+      return;
+    }
+    r.data.forEach(function (x) { B.rows[x.item_id] = x; });
+    if (r.data.length < 1000) break;
+  }
+  renderBatch();
+}
+
+function bStatus(item) { var r = B.rows[item.id]; return r ? r.status : "pending"; }
+
+function renderBatch() {
+  var n = { pending: 0, done: 0, approved: 0, rejected: 0, not_found: 0, failed: 0 };
+  B.order.forEach(function (it) { n[bStatus(it)]++; });
+  var finished = B.order.length - n.pending - n.failed;
+  var cards = [
+    [finished + " / " + B.order.length, "defined by WiseDefine"],
+    [n.done, "to review"], [n.approved, "approved"], [n.rejected, "rejected"],
+    [n.not_found, "not recognised"], [n.failed, "failed (will retry)"], [n.pending, "not yet defined"]
+  ];
+  bel("b-cards").innerHTML = cards.map(function (c) {
+    return '<div class="card"><div class="n">' + esc(c[0]) + '</div><div class="l">' + esc(c[1]) + '</div></div>';
+  }).join("");
+  renderBatchList();
+}
+
+function shownItems() {
+  var f = bel("b-filter").value, c = bel("b-coll").value, q = (bel("b-q").value || "").toLowerCase();
+  return B.order.filter(function (it) {
+    if (c !== "all" && it.coll !== c) return false;
+    if (f !== "all" && bStatus(it) !== f) return false;
+    return !q || it.entry.term.toLowerCase().indexOf(q) !== -1;
+  });
+}
+
+function renderBatchList() {
+  var items = shownItems();
+  bel("b-count").textContent = items.length + " shown";
+  var box = bel("b-list");
+  if (!items.length) { box.innerHTML = '<p style="font-size:13px;color:#6b6b72;margin:0">Nothing here.</p>'; return; }
+  box.innerHTML = items.slice(0, B.shown).map(function (it) {
+    var row = B.rows[it.id], st = bStatus(it), res = row && row.result, e = it.entry;
+    var tags = '<span class="tag">' + (it.coll === "stem" ? "STEM" : "BAL") + '</span><span class="tag">' + esc(e.domain) + '</span>' +
+      '<span class="tag ' + (st === "approved" ? "new" : st === "failed" || st === "not_found" ? "filtered" : "") + '">' + esc(st.replace("_", " ").replace("done", "to review")) + '</span>' +
+      (row && row.model ? '<span class="tag">' + esc(row.model) + '</span>' : '') + (row && row.cached ? '<span class="tag">saved result</span>' : '');
+    var html = '<div class="fb"><div class="meta"><strong style="font-size:15px;color:#14161C">' + esc(e.term) + '</strong> &nbsp;' + tags + '</div>';
+    html += '<div style="font-size:13px;margin-bottom:6px"><span style="color:#6b6b72">Current:</span> ' + esc(e.definition) + '</div>';
+    if (res && res.definition) {
+      html += '<div style="font-size:14px;margin-bottom:6px;padding:8px;background:#f1f6f2;border-radius:4px"><strong>WiseDefine:</strong> ' + esc(res.definition) + '</div>' +
+        '<div style="font-size:12px;color:#444;margin-bottom:8px">' +
+        (res.standard ? '<div><em>Standard:</em> ' + esc(res.standard) + '</div>' : '') +
+        '<div><em>Category:</em> ' + esc(res.category) + '</div><div><em>Identity:</em> ' + esc(res.identity) + '</div>' +
+        '<div><em>Mechanism:</em> ' + esc(res.mechanism) + '</div><div><em>Resolved:</em> ' + esc(res.problem) + '</div>' +
+        (res.domain ? '<div><em>WiseDefine domain:</em> ' + esc(res.domain) + '</div>' : '') + '</div>';
+    }
+    if (row && row.error) html += '<div style="font-size:12px;color:#A6363C;margin-bottom:6px">' + esc(row.error) + '</div>';
+    html += '<div class="row">';
+    if (st === "done" || st === "rejected") html += '<button class="primary" data-ba="approve" data-id="' + esc(it.id) + '">Approve</button>';
+    if (st === "approved") html += '<button data-ba="unapprove" data-id="' + esc(it.id) + '">Undo approve</button>';
+    if (st === "done" || st === "approved") html += '<button class="danger" data-ba="reject" data-id="' + esc(it.id) + '">Reject (keep current)</button>';
+    html += '<button data-ba="regen" data-id="' + esc(it.id) + '">' + (st === "pending" ? "Define now" : "Regenerate") + '</button>';
+    html += '</div></div>';
+    return html;
+  }).join("") + (items.length > B.shown ? '<button id="b-more">Show more (' + (items.length - B.shown) + ' left)</button>' : '');
+  box.querySelectorAll("button[data-ba]").forEach(function (b) { b.onclick = function () { batchAct(b); }; });
+  var more = bel("b-more");
+  if (more) more.onclick = function () { B.shown += 40; renderBatchList(); };
+}
+
+async function setRowStatus(id, status) {
+  var r = await sb.from("batch_definitions").update({ status: status, updated_at: new Date().toISOString() }).eq("item_id", id);
+  if (r.error) { alert("Couldn't save: " + r.error.message); return false; }
+  B.rows[id].status = status;
+  return true;
+}
+
+async function batchAct(b) {
+  var id = b.dataset.id, a = b.dataset.ba;
+  var it = B.order.find(function (x) { return x.id === id; });
+  if (a === "approve") await setRowStatus(id, "approved");
+  else if (a === "unapprove") await setRowStatus(id, "done");
+  else if (a === "reject") await setRowStatus(id, "rejected");
+  else if (a === "regen") {
+    if (B.running) { alert("Pause the batch first."); return; }
+    b.disabled = true; b.textContent = "Asking WiseDefine…";
+    var out = await defineOne(it, bStatus(it) !== "pending");
+    if (out.kind === "capacity" || out.kind === "auth" || out.kind === "limit") {
+      alert(stopMessage(out));
+    } else {
+      await saveOutcome(it, out);
+    }
+  }
+  renderBatch();
+}
+
+async function approveAllShown() {
+  var ids = shownItems().filter(function (it) { return bStatus(it) === "done"; }).map(function (it) { return it.id; });
+  if (!ids.length) { alert("Nothing “to review” in this view."); return; }
+  if (!confirm("Approve " + ids.length + " definitions?")) return;
+  for (var i = 0; i < ids.length; i += 200) {
+    var part = ids.slice(i, i + 200);
+    var r = await sb.from("batch_definitions").update({ status: "approved", updated_at: new Date().toISOString() }).in("item_id", part);
+    if (r.error) { alert("Couldn't save: " + r.error.message); break; }
+    part.forEach(function (id) { B.rows[id].status = "approved"; });
+  }
+  renderBatch();
+}
+
+async function sha256Hex(text) {
+  var buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(function (x) { return x.toString(16).padStart(2, "0"); }).join("");
+}
+
+// One term through the real engine. fresh = forget the saved result first.
+async function defineOne(it, fresh) {
+  var userContent = "Term: " + it.entry.term;
+  try {
+    if (fresh) {
+      var key = await sha256Hex(LOOKUP_SYSTEM_PROMPT + "\n\n" + userContent);
+      await sb.rpc("admin_delete_definition", { p_key: key });
+    }
+    var s = await sb.auth.getSession();
+    var tok = s.data && s.data.session && s.data.session.access_token;
+    if (!tok) return { kind: "auth" };
+    var resp = await fetch(SUPABASE_URL + "/functions/v1/filter-definition", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + tok },
+      body: JSON.stringify({ system: LOOKUP_SYSTEM_PROMPT, userContent: userContent })
+    });
+    var text = await resp.text(), data = null;
+    try { data = JSON.parse(text); } catch (e) {}
+    if (resp.status === 401) return { kind: "auth" };
+    if (resp.status === 429) return { kind: data && data.error === "limit_reached" ? "limit" : "capacity" };
+    if (!resp.ok || !data) return { kind: "failed", error: "HTTP " + resp.status + ": " + text.slice(0, 200) };
+    var model = data.modelVersion || "";
+    if (/^gemma/i.test(model) && !bel("b-gemma").checked) return { kind: "capacity", gemma: true };
+    var cand = (data.candidates || [])[0];
+    var raw = ((cand && cand.content && cand.content.parts) || []).map(function (p) { return p.text || ""; }).join("").trim();
+    if (!raw) return { kind: "failed", error: "Empty answer", model: model };
+    var m = raw.match(/\{[\s\S]*\}/), parsed;
+    try { parsed = JSON.parse(m ? m[0] : raw); } catch (e) { return { kind: "failed", error: "Unreadable answer: " + raw.slice(0, 200), model: model }; }
+    if (parsed.error === "not_found") return { kind: "not_found", model: model, cached: !!data.cached };
+    if (!parsed.definition) return { kind: "failed", error: "No definition in answer", model: model };
+    return { kind: "done", result: parsed, model: model, cached: !!data.cached };
+  } catch (e) {
+    return { kind: "failed", error: String((e && e.message) || e) };
+  }
+}
+
+async function saveOutcome(it, out) {
+  var prev = B.rows[it.id];
+  var row = {
+    item_id: it.id, collection: it.coll, term: it.entry.term, status: out.kind,
+    result: out.result || (prev && out.kind === "failed" ? prev.result : null),
+    model: out.model || null, cached: !!out.cached, error: out.error || null,
+    attempts: ((prev && prev.attempts) || 0) + 1, updated_at: new Date().toISOString()
+  };
+  var r = await sb.from("batch_definitions").upsert(row, { onConflict: "item_id" });
+  if (r.error) { bel("b-line").textContent = "Couldn't save “" + it.entry.term + "”: " + r.error.message; return false; }
+  B.rows[it.id] = row;
+  return true;
+}
+
+function nextItem() {
+  var p = B.order.find(function (it) { return bStatus(it) === "pending"; });
+  if (p) return p;
+  return B.order.find(function (it) { return bStatus(it) === "failed" && (B.rows[it.id].attempts || 0) < 3; });
+}
+
+function stopMessage(out) {
+  if (out.kind === "auth") return "Your sign-in has expired. Sign in again on WiseDefine, come back here and press Start.";
+  if (out.kind === "limit") return "The 5-per-day limit still applies to this account — run batch-setup in the Supabase SQL Editor first.";
+  return out.gemma
+    ? "Gemini's free quota is used up for today (only the Gemma last-resort model is answering)."
+    : "The AI quota is used up for now.";
+}
+
+function batchPause() {
+  B.running = false;
+  bel("b-start").disabled = false; bel("b-pause").disabled = true;
+  bel("b-line").textContent = "Paused. Press Start to continue.";
+}
+
+async function batchStart() {
+  if (B.running) return;
+  B.running = true;
+  bel("b-start").disabled = true; bel("b-pause").disabled = false;
+  while (B.running) {
+    var it = nextItem();
+    if (!it) { batchPause(); bel("b-line").textContent = "Every term has been through WiseDefine. Review them below, then export."; break; }
+    bel("b-line").textContent = "Defining “" + it.entry.term + "”…";
+    var out = await defineOne(it, false);
+    if (!B.running) break;
+    if (out.kind === "capacity") {
+      if (!bel("b-wait").checked) { batchPause(); bel("b-line").textContent = stopMessage(out) + " Press Start later — Gemini's daily quota resets around 10–11 am Ethiopia time."; break; }
+      var until = Date.now() + 30 * 60 * 1000;
+      while (B.running && Date.now() < until) {
+        var mins = Math.ceil((until - Date.now()) / 60000);
+        bel("b-line").textContent = stopMessage(out) + " Trying again in " + mins + " min… (keep this page open, or Pause and press Start another day)";
+        await bsleep(5000);
+      }
+      continue;
+    }
+    if (out.kind === "auth" || out.kind === "limit") { batchPause(); bel("b-line").textContent = stopMessage(out); break; }
+    await saveOutcome(it, out);
+    renderBatch();
+    var wait = Math.max(2, Number(bel("b-delay").value) || 13) * 1000, end = Date.now() + wait;
+    while (B.running && Date.now() < end) await bsleep(500);
+  }
+}
+
+function exportColl(key) {
+  var d = B.lib[key];
+  if (!d) { alert("That library file couldn't be loaded."); return; }
+  var withDone = bel("b-exp-done").checked;
+  var copy = JSON.parse(JSON.stringify(d)), n = 0;
+  copy.entries.forEach(function (e) {
+    var row = B.rows[key + ":" + e.id], res = row && row.result;
+    if (!row || !res || !res.definition) return;
+    if (!(row.status === "approved" || (withDone && row.status === "done"))) return;
+    e.definition = res.definition;
+    e.fields = { category: res.category, identity: res.identity, mechanism: res.mechanism, problem: res.problem };
+    if (res.standard) e.standard = res.standard;
+    if (res.domain) e.engineDomain = res.domain;
+    e.definedBy = "WiseDefine";
+    n++;
+  });
+  copy.version = new Date().toISOString().slice(0, 10);
+  var blob = new Blob([JSON.stringify(copy)], { type: "application/json" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = key + ".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  bel("b-exp-msg").textContent = key + ".json downloaded — " + n + " of " + copy.entries.length + " terms carry WiseDefine's new definition.";
 }
 
 start();

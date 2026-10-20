@@ -1243,7 +1243,7 @@ function WiseApp() {
     // Saved collections, each a JSON file next to this page (STEM 333; Business, Administration and Law).
     // A missing file is skipped, so the others still load.
     const load = (url) => fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
-    const files = [["stem.json", "library/stem.json"], ["bal.json"], ["hw.json"], ["eah.json"]];
+    const files = [["stem.json", "library/stem.json"], ["bal.json"], ["hw.json"], ["eah.json"], ["spc.json"]];
     Promise.all(
       files.map(([first, second]) =>
         load(first)

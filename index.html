@@ -962,6 +962,9 @@ async function callSharedBackend(system, userContent) {
     if (response.status === 429) {
       throw new Error("WiseDefine's AI service is at capacity right now — please try again a little later.");
     }
+    if (response.status === 422) {
+      throw new Error("WiseDefine's AI couldn't produce a clean definition for this term just now — please try again in a moment.");
+    }
     throw new Error("WiseDefine couldn't complete this lookup right now — please try again in a moment. (code " + response.status + ")");
   }
 

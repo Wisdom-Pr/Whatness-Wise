@@ -239,10 +239,15 @@
             headers: { "Content-Type": "application/json", Authorization: "Bearer " + tok, apikey: SUPABASE_ANON_KEY },
             body: JSON.stringify({ plan: pair[0] === "plan-year-btn" ? "year" : "month" })
           });
-          var d = await r.json();
+          var d = await r.json().catch(function () { return {}; });
           if (r.ok && d && d.checkout_url) { window.location.href = d.checkout_url; return; }
-          throw new Error("no checkout url");
+          throw new Error("HTTP " + r.status + " " + JSON.stringify(d).slice(0, 200));
         } catch (e) {
+          // Visit the site with ?debug=1 to see why the short checkout wasn't used.
+          console.warn("Short checkout unavailable:", e && e.message);
+          if (/[?&]debug=1/.test(window.location.search)) {
+            alert("Short checkout unavailable: " + (e && e.message) + "\n\nOpening the standard checkout instead.");
+          }
           window.location.href = plainLink;
         } finally {
           setTimeout(function () { btn.disabled = false; btn.innerHTML = label; }, 4000);

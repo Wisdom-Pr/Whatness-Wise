@@ -71,8 +71,8 @@
       <button id="plan-year-btn" type="button" style="font-family:ui-sans-serif,system-ui; font-size:14px; font-weight:600; border:none; border-radius:4px; padding:11px 14px; cursor:pointer; width:100%; background:#0B1D45; color:#fff; margin-bottom:4px;">Yearly — $25 for 12 months <span style="color:#FFD54F;">(save 30%)</span></button>
       <p style="font-size:12px; color:#555; margin:4px 0 14px;">One-time payment by card. No automatic renewal — you choose whether to extend.</p>
 
-      <div style="border-top:1px solid #dcd8cc; padding-top:12px; margin-bottom:12px;">
-        <div style="font-weight:700; font-size:14px; margin-bottom:4px;">Can't pay by card? Make a deal.</div>
+      <div id="deal-section" style="display:none; border-top:1px solid #dcd8cc; padding-top:12px; margin-bottom:12px;">
+        <div style="font-weight:700; font-size:14px; margin-bottom:4px;">In Ethiopia? Pay in Birr.</div>
         <p style="font-size:13px; color:#2A2A2E; margin:0 0 8px;">Pay by TeleBirr, CBE Birr, bank, cash, or through your institution. Send a request and we'll contact you.</p>
         <button id="deal-open-btn" type="button" style="font-family:ui-sans-serif,system-ui; font-size:14px; font-weight:600; border:none; border-radius:4px; padding:11px 14px; cursor:pointer; width:100%; background:#fff; color:#14161C; border:1px solid #14161C;">Request a flexible payment</button>
       </div>
@@ -181,7 +181,26 @@
   var DODO_MONTHLY_ID = "pdt_0NqMS1OALgWYGw48kKrEQ";  // WiseDefine Pro — 1 month, $3
   var DODO_YEARLY_ID = "pdt_0NqMSCaJHN3uHZY16vW6b";   // WiseDefine Pro — 12 months, $25
 
+  // The Birr "flexible payment" option is for users in Ethiopia only. Shown when the
+  // device's time zone or language is Ethiopian, or when the page is opened with
+  // ?pay=birr (a link you can share with Ethiopian users whose device settings differ).
+  function wiseIsEthiopia() {
+    try {
+      if (/(^|[?&])pay=birr(&|$)/i.test(window.location.search)) {
+        try { localStorage.setItem("wd_pay_birr", "1"); } catch (e) {}
+        return true;
+      }
+      try { if (localStorage.getItem("wd_pay_birr") === "1") return true; } catch (e) {}
+      var tz = (Intl.DateTimeFormat().resolvedOptions().timeZone || "");
+      if (tz === "Africa/Addis_Ababa") return true;
+      var langs = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ""]);
+      return langs.some(function (l) { return /^(am|om|ti)\b/i.test(l) || /-ET$/i.test(l); });
+    } catch (e) { return false; }
+  }
+
   function upgradeModalShow(show) {
+    var ds = document.getElementById("deal-section");
+    if (ds) ds.style.display = wiseIsEthiopia() ? "block" : "none";
     document.getElementById("upgrade-modal").style.display = show ? "flex" : "none";
     document.getElementById("upgrade-plans").style.display = "block";
     document.getElementById("deal-form").style.display = "none";

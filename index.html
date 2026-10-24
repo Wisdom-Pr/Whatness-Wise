@@ -332,7 +332,8 @@
       }
     } catch (e) {
       st.style.color = "#A6363C";
-      st.textContent = "Sorry, the code couldn't be checked right now. Please try again in a moment.";
+      st.textContent = "Sorry, the code couldn't be checked right now. Please try again in a moment. (" + String((e && (e.message || e.code)) || e).slice(0, 160) + ")";
+      console.warn("redeem_license_code failed:", e);
     } finally {
       btn.disabled = false;
     }

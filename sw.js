@@ -5,7 +5,7 @@
 // version made updates invisible until the cache was manually cleared).
 // The cached copy is kept purely as an offline fallback.
 
-const CACHE_NAME = "wisedefine-v18";
+const CACHE_NAME = "wisedefine-v19";
 const CORE_ASSETS = ["./", "./index.html"];
 
 self.addEventListener("install", (event) => {
@@ -55,6 +55,23 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Library files (stem.json, hw.json …) grow often: always fetch the newest,
+  // and use the saved copy only when offline. Never keep a failed response.
+  if (url.pathname.endsWith(".json")) {
+    event.respondWith(
+      fetch(event.request, { cache: "no-cache" })
+        .then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
   // Everything else (fonts, scripts): cache first is fine, they rarely change.
   event.respondWith(
     caches.match(event.request).then((cached) => {
@@ -62,8 +79,10 @@ self.addEventListener("fetch", (event) => {
         cached ||
         fetch(event.request)
           .then((response) => {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+            if (response.ok) {
+              const copy = response.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+            }
             return response;
           })
           .catch(() => cached)

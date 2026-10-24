@@ -30,7 +30,7 @@
   button.primary { background:var(--green); color:#fff; border-color:var(--green); }
   button.danger { background:#fff; color:var(--red); border-color:var(--red); }
   button.dark { background:var(--ink); color:#fff; border-color:var(--ink); }
-  select, input[type=text] { font-family:inherit; font-size:13px; padding:6px 8px; border:1px solid var(--line); border-radius:4px; background:#fff; }
+  select, input[type=text], input[type=date] { font-family:inherit; font-size:13px; padding:6px 8px; border:1px solid var(--line); border-radius:4px; background:#fff; }
   .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   .fb { border:1px solid var(--line); border-radius:6px; background:#fff; padding:12px; margin-bottom:10px; }
   .fb.pinned { border-left:4px solid #FFD54F; }
@@ -87,7 +87,7 @@ async function start() {
     return;
   }
   renderShell();
-  loadStats(); loadRequests(); loadAccounts(); loadDefs(); loadSwitch(); loadFeedback(); loadWords(); loadBlocked(); loadBatch();
+  loadStats(); loadRequests(); loadAccounts(); loadDefs(); loadSwitch(); loadFeedback(); loadWords(); loadBlocked(); loadBatch(); loadLicenses();
 }
 
 function renderShell() {
@@ -101,6 +101,7 @@ function renderShell() {
       '<input type="text" id="g-extra" placeholder="" style="display:none;width:130px" />' +
       '<button class="primary" id="g-go">Grant</button><button class="danger" id="g-revoke">Set back to Free</button></div>' +
       '<div class="msgline" id="g-msg"></div></div>' +
+    licSectionHtml() +
     '<h2>Flexible payment requests</h2><div class="panel"><div class="row" style="margin-bottom:8px"><select id="pr-filter"><option value="open">Open (new + contacted)</option><option value="granted">Granted</option><option value="declined">Declined</option><option value="all">All</option></select></div><div id="pr-list">Loading…</div></div>' +
     '<h2>Accounts</h2><div class="panel"><div class="row" style="margin-bottom:8px"><input type="text" id="acc-q" placeholder="search email" /><span id="acc-count" style="font-size:12px;color:#6b6b72"></span></div><div style="overflow-x:auto"><table id="acc"></table></div></div>' +
     '<h2>Saved definitions</h2><div class="panel"><div class="row" style="margin-bottom:8px"><input type="text" id="def-q" placeholder="search text" /><span id="def-count" style="font-size:12px;color:#6b6b72"></span></div><div id="defs">Loading…</div></div>' +
@@ -128,6 +129,7 @@ function renderShell() {
     x.placeholder = this.value === "m" ? "months, e.g. 36" : "YYYY-MM-DD";
   };
   document.getElementById("g-go").onclick = grantPro;
+  wireLic();
   document.getElementById("g-revoke").onclick = revokePro;
   document.getElementById("pr-filter").onchange = loadRequests;
   document.getElementById("def-q").oninput = renderDefs;
@@ -729,6 +731,167 @@ async function exportColl(key) {
   a.href = URL.createObjectURL(blob); a.download = key + ".json";
   document.body.appendChild(a); a.click(); a.remove();
   bel("b-exp-msg").textContent = key + ".json downloaded — " + n + " of " + copy.entries.length + " terms carry WiseDefine's new definition.";
+}
+
+// ===================== University licences =====================
+function licSectionHtml() {
+  return '<h2>University licences</h2><div class="panel" id="lic">' +
+    '<p style="font-size:13px;margin-top:0">One licence per institution deal. <strong>Shared</strong>: one code for all students (e.g. AASTU/48213), up to the number of seats. <strong>Individual</strong>: one single-use code per student, to hand out. Everyone on a licence has Pro until its end date.</p>' +
+    '<div class="row" style="margin-bottom:6px">' +
+      '<input type="text" id="lic-name" placeholder="Institution, e.g. Addis Ababa Science and Technology University" style="min-width:320px;flex:1" />' +
+      '<input type="text" id="lic-prefix" placeholder="Prefix, e.g. AASTU" style="width:120px" maxlength="10" />' +
+    '</div>' +
+    '<div class="row" style="margin-bottom:6px">' +
+      '<select id="lic-type"><option value="shared">Shared code</option><option value="individual">Individual codes</option></select>' +
+      '<input type="text" id="lic-seats" placeholder="Seats, e.g. 10000" style="width:130px" />' +
+      '<select id="lic-dur"><option value="1">1 month</option><option value="6">6 months</option><option value="12" selected>12 months</option><option value="custom">Custom end date</option></select>' +
+      '<label style="font-size:12px">Start <input type="date" id="lic-start" /></label>' +
+      '<label style="font-size:12px">End <input type="date" id="lic-end" /></label>' +
+    '</div>' +
+    '<div class="row" style="margin-bottom:6px">' +
+      '<input type="text" id="lic-domain" placeholder="Optional: only emails @ this domain, e.g. aastu.edu.et" style="min-width:320px;flex:1" />' +
+      '<input type="text" id="lic-notes" placeholder="Notes (price, contact person…)" style="min-width:220px;flex:1" />' +
+      '<button class="primary" id="lic-create">Create licence</button>' +
+    '</div>' +
+    '<div class="msgline" id="lic-msg"></div>' +
+    '<div id="lic-list" style="margin-top:12px">Loading…</div>' +
+  '</div>';
+}
+
+function licIso(d) { return d.toISOString().slice(0, 10); }
+function licAddMonths(iso, m) {
+  var d = new Date(iso + "T00:00:00Z"); var day = d.getUTCDate();
+  d.setUTCMonth(d.getUTCMonth() + m);
+  if (d.getUTCDate() < day) d.setUTCDate(0);
+  d.setUTCDate(d.getUTCDate() - 1); // e.g. 1 Nov + 12 months -> 31 Oct
+  return licIso(d);
+}
+function licAutoEnd() {
+  var dur = bel("lic-dur").value, start = bel("lic-start").value;
+  if (dur !== "custom" && start) bel("lic-end").value = licAddMonths(start, Number(dur));
+}
+
+function wireLic() {
+  bel("lic-start").value = licIso(new Date());
+  licAutoEnd();
+  bel("lic-dur").onchange = licAutoEnd;
+  bel("lic-start").onchange = licAutoEnd;
+  bel("lic-end").onchange = function () { bel("lic-dur").value = "custom"; };
+  bel("lic-name").oninput = function () {
+    if (bel("lic-prefix").dataset.touched) return;
+    // Suggest a prefix from the capital letters of the name.
+    var words = this.value.split(/[^A-Za-z0-9]+/).filter(function (w) { return w && !/^(of|and|the|for|in|at)$/i.test(w); });
+    bel("lic-prefix").value = words.map(function (w) { return w[0]; }).join("").toUpperCase().slice(0, 10);
+  };
+  bel("lic-prefix").oninput = function () { this.dataset.touched = "1"; this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); };
+  bel("lic-create").onclick = licCreate;
+}
+
+async function licCreate() {
+  var msg = bel("lic-msg");
+  var seats = Number(String(bel("lic-seats").value).replace(/[, ]/g, ""));
+  var type = bel("lic-type").value;
+  if (type === "individual" && seats > 2000 &&
+      !confirm("Create " + seats.toLocaleString() + " individual codes? This can take a little while.")) return;
+  msg.textContent = "Creating…";
+  var r = await sb.rpc("admin_create_license", {
+    p_institution: bel("lic-name").value, p_prefix: bel("lic-prefix").value, p_code_type: type,
+    p_seats: seats || 0, p_starts_on: bel("lic-start").value || null, p_ends_on: bel("lic-end").value || null,
+    p_email_domain: bel("lic-domain").value, p_notes: bel("lic-notes").value
+  });
+  if (r.error) { msg.textContent = "Couldn't create: " + r.error.message; return; }
+  msg.textContent = r.data && r.data.message ? r.data.message : "Done.";
+  msg.style.color = r.data && r.data.ok ? "#3C6E4F" : "#A6363C";
+  if (r.data && r.data.ok) {
+    ["lic-name", "lic-prefix", "lic-seats", "lic-domain", "lic-notes"].forEach(function (id) { bel(id).value = ""; });
+    delete bel("lic-prefix").dataset.touched;
+  }
+  loadLicenses();
+}
+
+async function loadLicenses() {
+  var box = bel("lic-list");
+  var r = await sb.rpc("admin_list_licenses");
+  if (r.error) {
+    box.innerHTML = '<div style="font-size:13px;color:#A6363C">Run licences-setup in the Supabase SQL Editor first. (' + esc(r.error.message) + ')</div>';
+    return;
+  }
+  if (!r.data.length) { box.innerHTML = '<p style="font-size:13px;color:#6b6b72;margin:0">No licences yet.</p>'; return; }
+  var today = licIso(new Date());
+  box.innerHTML = r.data.map(function (l) {
+    var status = !l.active ? '<span class="tag hidden">off</span>'
+      : (today < l.starts_on ? '<span class="tag">starts ' + esc(l.starts_on) + '</span>'
+      : (today > l.ends_on ? '<span class="tag filtered">ended</span>' : '<span class="tag new">active</span>'));
+    var pct = Math.min(100, Math.round(100 * l.seats_used / Math.max(1, l.seats)));
+    var code = l.code_type === "shared"
+      ? '<div style="font-size:18px;font-weight:700;letter-spacing:.5px;margin:6px 0">' + esc(l.shared_code) +
+        ' <button data-lic="copy" data-code="' + esc(l.shared_code) + '">Copy</button></div>'
+      : '<div style="font-size:13px;margin:6px 0">Individual codes · <button data-lic="codes" data-id="' + l.id + '" data-name="' + esc(l.prefix) + '">Download codes (CSV)</button></div>';
+    return '<div class="fb">' +
+      '<div class="meta"><strong style="font-size:15px;color:#14161C">' + esc(l.institution) + '</strong> &nbsp;' + status +
+        '<span class="tag">' + esc(l.code_type) + '</span>' + (l.email_domain ? '<span class="tag">@' + esc(l.email_domain) + '</span>' : '') + '</div>' +
+      code +
+      '<div style="font-size:13px;margin-bottom:4px"><strong>' + l.seats_used.toLocaleString() + '</strong> of ' + l.seats.toLocaleString() + ' seats used · ' +
+        esc(l.starts_on) + ' → <strong>' + esc(l.ends_on) + '</strong>' + (l.notes ? ' · ' + esc(l.notes) : '') + '</div>' +
+      '<div style="height:6px;background:#eee;border-radius:3px;margin-bottom:8px"><div style="height:6px;width:' + pct + '%;background:#3C6E4F;border-radius:3px"></div></div>' +
+      '<div class="row">' +
+        '<button data-lic="ext" data-id="' + l.id + '" data-end="' + l.ends_on + '" data-m="1">+1 month</button>' +
+        '<button data-lic="ext" data-id="' + l.id + '" data-end="' + l.ends_on + '" data-m="6">+6 months</button>' +
+        '<button data-lic="ext" data-id="' + l.id + '" data-end="' + l.ends_on + '" data-m="12">+12 months</button>' +
+        '<button data-lic="seats" data-id="' + l.id + '" data-seats="' + l.seats + '">Change seats</button>' +
+        '<button data-lic="members" data-id="' + l.id + '" data-name="' + esc(l.prefix) + '">Who joined (CSV)</button>' +
+        (l.code_type === "shared" ? '<button class="danger" data-lic="regen" data-id="' + l.id + '">Replace code</button>' : '') +
+        '<button class="' + (l.active ? 'danger' : 'primary') + '" data-lic="toggle" data-id="' + l.id + '" data-active="' + l.active + '">' + (l.active ? 'Switch off' : 'Switch on') + '</button>' +
+      '</div></div>';
+  }).join("");
+  box.querySelectorAll("button[data-lic]").forEach(function (b) { b.onclick = function () { licAct(b); }; });
+}
+
+function licDownload(name, rows) {
+  var csv = rows.map(function (r) { return r.map(function (v) { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(","); }).join("\n");
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv" }));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+}
+
+async function licAct(b) {
+  var id = Number(b.dataset.id), a = b.dataset.lic, r;
+  var msg = bel("lic-msg"); msg.style.color = "";
+  if (a === "copy") {
+    try { await navigator.clipboard.writeText(b.dataset.code); b.textContent = "Copied"; } catch (e) { prompt("Copy this code:", b.dataset.code); }
+    return;
+  }
+  if (a === "codes") {
+    r = await sb.rpc("admin_license_codes", { p_id: id });
+    if (r.error) { alert(r.error.message); return; }
+    licDownload(b.dataset.name + "-codes.csv", [["code", "used", "used by", "used at"]].concat(r.data.map(function (x) { return [x.code, x.redeemed ? "yes" : "no", x.redeemed_by_email, x.redeemed_at]; })));
+    return;
+  }
+  if (a === "members") {
+    r = await sb.rpc("admin_license_members", { p_id: id });
+    if (r.error) { alert(r.error.message); return; }
+    licDownload(b.dataset.name + "-members.csv", [["email", "code", "joined"]].concat(r.data.map(function (x) { return [x.email, x.code, x.redeemed_at]; })));
+    return;
+  }
+  if (a === "ext") {
+    var newEnd = licAddMonths(licIso(new Date(new Date(b.dataset.end + "T00:00:00Z").getTime() + 86400000)), Number(b.dataset.m));
+    if (!confirm("Extend this licence to " + newEnd + "? Everyone who joined gets Pro until then.")) return;
+    r = await sb.rpc("admin_update_license", { p_id: id, p_ends_on: newEnd, p_seats: null, p_active: null, p_email_domain: null });
+  } else if (a === "seats") {
+    var s = prompt("New number of seats:", b.dataset.seats);
+    if (!s) return;
+    r = await sb.rpc("admin_update_license", { p_id: id, p_ends_on: null, p_seats: Number(String(s).replace(/[, ]/g, "")), p_active: null, p_email_domain: null });
+  } else if (a === "regen") {
+    if (!confirm("Replace this code? The old code stops working immediately; students who already joined keep their access.")) return;
+    r = await sb.rpc("admin_regenerate_shared_code", { p_id: id });
+  } else if (a === "toggle") {
+    var on = b.dataset.active !== "true";
+    if (!on && !confirm("Switch off? No new students can join. Students who already joined keep Pro until the end date.")) return;
+    r = await sb.rpc("admin_update_license", { p_id: id, p_ends_on: null, p_seats: null, p_active: on, p_email_domain: null });
+  }
+  if (r && r.error) { msg.textContent = r.error.message; msg.style.color = "#A6363C"; }
+  else if (r && r.data) { msg.textContent = r.data.message || "Done."; msg.style.color = r.data.ok ? "#3C6E4F" : "#A6363C"; }
+  loadLicenses();
 }
 
 start();

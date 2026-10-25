@@ -1130,6 +1130,33 @@ function FieldRow({ label, value, tone }) {
   );
 }
 
+function ShareRow({ entry }) {
+  const [copied, setCopied] = useState(false);
+  const site = "https://wisedefine.wisdompro.tech/";
+  const path = entry.page || (entry.hasPermanentPage ? `${entry.id}.html` : `?q=${encodeURIComponent(entry.term)}`);
+  const url = site + path;
+  const text = `${entry.term}: ${entry.definition}\n\nDefined by WiseDefine`;
+  const links = [
+    ["Telegram", `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`],
+    ["WhatsApp", `https://wa.me/?text=${encodeURIComponent(text + "\n" + url)}`],
+    ["Facebook", `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`],
+  ];
+  const btn = { fontFamily: "ui-sans-serif, system-ui", fontSize: 12, fontWeight: 600, color: NAVY, background: "#fff", border: `1px solid ${RULE}`, borderRadius: 3, padding: "4px 10px", textDecoration: "none", cursor: "pointer", lineHeight: 1.4 };
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(url); } catch (e) { window.prompt("Copy this link:", url); }
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 10 }}>
+      <span style={{ fontFamily: "ui-sans-serif, system-ui", fontSize: 12, color: "#6b6b72", marginRight: 2 }}>Share:</span>
+      {links.map(([name, href]) => (
+        <a key={name} href={href} target="_blank" rel="noopener noreferrer" style={btn}>{name}</a>
+      ))}
+      <button type="button" onClick={copy} style={btn}>{copied ? "Link copied" : "Copy link"}</button>
+    </div>
+  );
+}
+
 function EntryCard({ entry, entries, expanded, onToggle }) {
   const pairEntry = entry.pair ? entries.find((e) => e.id === entry.pair) : null;
   return (
@@ -1172,6 +1199,7 @@ function EntryCard({ entry, entries, expanded, onToggle }) {
       <p style={{ fontFamily: "ui-serif, Georgia, serif", fontSize: 16, color: INK, lineHeight: 1.6, margin: 0 }}>
         {entry.definition}
       </p>
+      <ShareRow entry={entry} />
       {expanded && (
         <div style={{ marginTop: 14, background: "#FDFCF7", border: `1px solid ${RULE}`, borderRadius: 3, padding: "10px 14px" }}>
           <FieldRow label="Category" value={entry.fields.category} />

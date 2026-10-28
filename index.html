@@ -1479,8 +1479,9 @@ function WiseApp() {
 
   const addEntry = (entry) => {
     setEntries((prev) => {
+      // Newest definition goes first, so it appears right below the search bar.
       const withoutDupe = prev.filter((e) => e.id !== entry.id);
-      return [...withoutDupe, entry];
+      return [entry, ...withoutDupe];
     });
     setExpandedId(entry.id);
   };

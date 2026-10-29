@@ -48,7 +48,8 @@
 .wd-frame svg { display: block; width: 100%; height: 100%; }
 .wd-frame-left { left: 0; transform: scaleX(-1); }
 .wd-frame-right { right: 0; }
-@media (max-width: 600px) { .wd-frame { display: none; } }
+/* Phones: a slim version, 12px wide, inside the page's 20px side margin so it never covers text. */
+@media (max-width: 600px) { .wd-frame { width: 12px; z-index: 2; } }
 
 #root, #accountbar, #keybar { position: relative; z-index: 1; }
 </style>

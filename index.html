@@ -46,9 +46,11 @@
    space beside it, from the top of the screen to the bottom. Hidden where there is no room. */
 .wd-frame { position: fixed; top: 0; height: 100vh; height: 100dvh; width: min(15vh, calc((100vw - 480px) / 2 - 6px)); pointer-events: none; z-index: 0; }
 .wd-frame svg { display: block; width: 100%; height: 100%; }
-.wd-frame-left { right: calc(50% + 243px); }
-.wd-frame-right { left: calc(50% + 243px); transform: scaleX(-1); }
+.wd-frame-left { right: calc(50% + 243px); transform: scaleX(-1); }
+.wd-frame-right { left: calc(50% + 243px); }
 @media (max-width: 600px) { .wd-frame { display: none; } }
+/* Wide screens: black surround, so the app column stands out between the frames. */
+@media (min-width: 601px) { html, body { background: #000000; } }
 #root, #accountbar, #keybar { position: relative; z-index: 1; }
 </style>
 <link rel="manifest" href="manifest.json" />
@@ -455,8 +457,8 @@
 </div>
 
 <!-- WiseDefine side frames: blue, red and black chevrons beside the app column (wide screens only) -->
-<div class="wd-frame wd-frame-left"><svg viewBox="0 0 234 1620" preserveAspectRatio="none" aria-hidden="true"><polygon fill="#00B0F0" points="233,15 5,810 233,1610 233,1380 38,815 233,250"/><polygon fill="#EE0000" points="231,285 47,815 231,1345 231,1235 113,818 231,400"/><polygon fill="#000000" points="226,450 121,818 226,1185"/></svg></div>
-<div class="wd-frame wd-frame-right"><svg viewBox="0 0 234 1620" preserveAspectRatio="none" aria-hidden="true"><polygon fill="#00B0F0" points="233,15 5,810 233,1610 233,1380 38,815 233,250"/><polygon fill="#EE0000" points="231,285 47,815 231,1345 231,1235 113,818 231,400"/><polygon fill="#000000" points="226,450 121,818 226,1185"/></svg></div>
+<div class="wd-frame wd-frame-left"><svg viewBox="0 0 234 1620" preserveAspectRatio="none" aria-hidden="true"><polygon fill="#FFFFFF" points="233,15 5,810 233,1610"/><polygon fill="#00B0F0" points="233,15 5,810 233,1610 233,1380 38,815 233,250"/><polygon fill="#EE0000" points="231,285 47,815 231,1345 231,1235 113,818 231,400"/><polygon fill="#0B1D45" points="226,450 121,818 226,1185"/></svg></div>
+<div class="wd-frame wd-frame-right"><svg viewBox="0 0 234 1620" preserveAspectRatio="none" aria-hidden="true"><polygon fill="#FFFFFF" points="233,15 5,810 233,1610"/><polygon fill="#00B0F0" points="233,15 5,810 233,1610 233,1380 38,815 233,250"/><polygon fill="#EE0000" points="231,285 47,815 231,1345 231,1235 113,818 231,400"/><polygon fill="#0B1D45" points="226,450 121,818 226,1185"/></svg></div>
 <div id="root"></div>
 
 <script>
@@ -1536,7 +1538,7 @@ function WiseApp() {
 
   return (
     <div style={{ background: "transparent", minHeight: "100%", display: "flex", justifyContent: "center" }}>
-      <div style={{ width: "100%", maxWidth: 480, padding: "22px 20px 60px" }}>
+      <div style={{ width: "100%", maxWidth: 480, padding: "22px 20px 60px", background: PAPER, minHeight: "100vh", boxSizing: "border-box" }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
           <img src={EMBLEM_SRC} alt="" style={{ width: 44, height: 44, flexShrink: 0 }} />

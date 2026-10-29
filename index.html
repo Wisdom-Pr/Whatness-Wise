@@ -46,11 +46,10 @@
    space beside it, from the top of the screen to the bottom. Hidden where there is no room. */
 .wd-frame { position: fixed; top: 0; height: 100vh; height: 100dvh; width: min(15vh, calc((100vw - 480px) / 2 - 6px)); pointer-events: none; z-index: 0; }
 .wd-frame svg { display: block; width: 100%; height: 100%; }
-.wd-frame-left { right: calc(50% + 243px); transform: scaleX(-1); }
-.wd-frame-right { left: calc(50% + 243px); }
+.wd-frame-left { left: 0; transform: scaleX(-1); }
+.wd-frame-right { right: 0; }
 @media (max-width: 600px) { .wd-frame { display: none; } }
-/* Wide screens: black surround, so the app column stands out between the frames. */
-@media (min-width: 601px) { html, body { background: #000000; } }
+
 #root, #accountbar, #keybar { position: relative; z-index: 1; }
 </style>
 <link rel="manifest" href="manifest.json" />

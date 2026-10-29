@@ -41,6 +41,15 @@
   #keybar label { color: #F7F4EC; font-family: ui-sans-serif, system-ui; font-size: 12px; white-space: nowrap; }
   #keybar .note { color: #b7bdae; font-size: 11px; }
   #keybar-status { font-family: ui-sans-serif, system-ui; font-size: 12px; font-weight: 600; white-space: nowrap; }
+
+/* WiseDefine side frames. The app column is 480px wide and centred; each frame fills the
+   space beside it, from the top of the screen to the bottom. Hidden where there is no room. */
+.wd-frame { position: fixed; top: 0; height: 100vh; height: 100dvh; width: min(15vh, calc((100vw - 480px) / 2 - 6px)); pointer-events: none; z-index: 0; }
+.wd-frame svg { display: block; width: 100%; height: 100%; }
+.wd-frame-left { right: calc(50% + 243px); }
+.wd-frame-right { left: calc(50% + 243px); transform: scaleX(-1); }
+@media (max-width: 600px) { .wd-frame { display: none; } }
+#root, #accountbar, #keybar { position: relative; z-index: 1; }
 </style>
 <link rel="manifest" href="manifest.json" />
 </head>
@@ -445,6 +454,9 @@
   <span class="note" id="keybar-note">Saved only in this browser on this device.</span>
 </div>
 
+<!-- WiseDefine side frames: blue, red and black chevrons beside the app column (wide screens only) -->
+<div class="wd-frame wd-frame-left"><svg viewBox="0 0 234 1620" preserveAspectRatio="none" aria-hidden="true"><polygon fill="#00B0F0" points="233,15 5,810 233,1610 233,1380 38,815 233,250"/><polygon fill="#EE0000" points="231,285 47,815 231,1345 231,1235 113,818 231,400"/><polygon fill="#000000" points="226,450 121,818 226,1185"/></svg></div>
+<div class="wd-frame wd-frame-right"><svg viewBox="0 0 234 1620" preserveAspectRatio="none" aria-hidden="true"><polygon fill="#00B0F0" points="233,15 5,810 233,1610 233,1380 38,815 233,250"/><polygon fill="#EE0000" points="231,285 47,815 231,1345 231,1235 113,818 231,400"/><polygon fill="#000000" points="226,450 121,818 226,1185"/></svg></div>
 <div id="root"></div>
 
 <script>
@@ -1157,25 +1169,6 @@ function ShareRow({ entry }) {
   );
 }
 
-// WiseDefine bracket marks: nested blue, red and black chevrons placed either side of a defined term.
-function BracketMark({ side, height }) {
-  const flip = side === "right";
-  return (
-    <svg
-      viewBox="0 0 234 1620"
-      height={height}
-      width={(height * 234) / 1620 * 2.2}
-      preserveAspectRatio="none"
-      aria-hidden="true"
-      style={{ flexShrink: 0, display: "block", transform: flip ? "scaleX(-1)" : "none" }}
-    >
-      <polygon fill="#00B0F0" points="233,15 5,810 233,1610 233,1380 38,815 233,250" />
-      <polygon fill="#EE0000" points="231,285 47,815 231,1345 231,1235 113,818 231,400" />
-      <polygon fill="#000000" points="226,450 121,818 226,1185" />
-    </svg>
-  );
-}
-
 function EntryCard({ entry, entries, expanded, onToggle }) {
   const pairEntry = entry.pair ? entries.find((e) => e.id === entry.pair) : null;
   return (
@@ -1191,10 +1184,8 @@ function EntryCard({ entry, entries, expanded, onToggle }) {
           width: "100%",
         }}
       >
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontFamily: "ui-serif, Georgia, serif", fontSize: 20, color: INK, fontWeight: 600 }}>
-          <BracketMark side="left" height={30} />
-          <span>{entry.term}</span>
-          <BracketMark side="right" height={30} />
+        <span style={{ fontFamily: "ui-serif, Georgia, serif", fontSize: 20, color: INK, fontWeight: 600 }}>
+          {entry.term}
         </span>
         <span style={{ fontFamily: "ui-sans-serif, system-ui", fontSize: 11, color: CRIMSON, letterSpacing: "0.02em" }}>
           {expanded ? "hide breakdown" : "show breakdown"}
@@ -1544,7 +1535,7 @@ function WiseApp() {
   };
 
   return (
-    <div style={{ background: PAPER, minHeight: "100%", display: "flex", justifyContent: "center" }}>
+    <div style={{ background: "transparent", minHeight: "100%", display: "flex", justifyContent: "center" }}>
       <div style={{ width: "100%", maxWidth: 480, padding: "22px 20px 60px" }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>

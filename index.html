@@ -1157,6 +1157,25 @@ function ShareRow({ entry }) {
   );
 }
 
+// WiseDefine bracket marks: nested blue, red and black chevrons placed either side of a defined term.
+function BracketMark({ side, height }) {
+  const flip = side === "right";
+  return (
+    <svg
+      viewBox="0 0 234 1620"
+      height={height}
+      width={(height * 234) / 1620 * 2.2}
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      style={{ flexShrink: 0, display: "block", transform: flip ? "scaleX(-1)" : "none" }}
+    >
+      <polygon fill="#00B0F0" points="233,15 5,810 233,1610 233,1380 38,815 233,250" />
+      <polygon fill="#EE0000" points="231,285 47,815 231,1345 231,1235 113,818 231,400" />
+      <polygon fill="#000000" points="226,450 121,818 226,1185" />
+    </svg>
+  );
+}
+
 function EntryCard({ entry, entries, expanded, onToggle }) {
   const pairEntry = entry.pair ? entries.find((e) => e.id === entry.pair) : null;
   return (
@@ -1168,12 +1187,14 @@ function EntryCard({ entry, entries, expanded, onToggle }) {
           cursor: "pointer",
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "baseline",
+          alignItems: "center",
           width: "100%",
         }}
       >
-        <span style={{ fontFamily: "ui-serif, Georgia, serif", fontSize: 20, color: INK, fontWeight: 600 }}>
-          {entry.term}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontFamily: "ui-serif, Georgia, serif", fontSize: 20, color: INK, fontWeight: 600 }}>
+          <BracketMark side="left" height={30} />
+          <span>{entry.term}</span>
+          <BracketMark side="right" height={30} />
         </span>
         <span style={{ fontFamily: "ui-sans-serif, system-ui", fontSize: 11, color: CRIMSON, letterSpacing: "0.02em" }}>
           {expanded ? "hide breakdown" : "show breakdown"}

@@ -873,10 +873,12 @@ CRITICAL — concision and directness. Even a definition with the right facts ca
 4. Rewrite the definition as ONE plain sentence in the pattern "[Term] is the/a [core WHAT] ... that/exercised through/produced by [discriminating mechanism]." Use vocabulary a first-time student already knows — no jargon that itself needs defining. One sentence only.
 5. Also classify the term's domain in a couple of words (e.g. "Structural Engineering", "Social Science", "Physics", "Biology"). If it applies to more than one, name the discipline whose usage your final sentence covers most completely.
 
+6. Check the spelling against the meaning. If the typed word is misspelled, or is a homophone or near-twin that does not fit the context the student gave (e.g. "complement (in praising someone)" when the meaning is "compliment"), define the word the student clearly meant, and put that correctly spelled term in "corrected", keeping any context in parentheses exactly as typed (e.g. "compliment (in praising someone)"). Write the definition sentence with the corrected word. If the spelling already fits the meaning, set "corrected" to "".
+
 If the term is not a real, recognizable academic word, phrase, or clause, respond with exactly: {"error":"not_found"}
 
 Otherwise respond with ONLY minified JSON, no markdown fences, no preamble, in exactly this shape:
-{"domain":"...","standard":"...","category":"...","identity":"...","mechanism":"...","problem":"...","definition":"..."}`;
+{"corrected":"","domain":"...","standard":"...","category":"...","identity":"...","mechanism":"...","problem":"...","definition":"..."}`;
 
 function extractJson(rawText) {
   const match = rawText.match(/\{[\s\S]*\}/);
@@ -1210,6 +1212,11 @@ function EntryCard({ entry, entries, expanded, onToggle }) {
           </>
         )}
       </div>
+      {entry.typed && (
+        <div style={{ fontFamily: "ui-sans-serif, system-ui", fontSize: 13, color: INK, background: "#FFF6D6", border: "1px solid #F2C744", borderRadius: 4, padding: "6px 10px", marginBottom: 10 }}>
+          You typed <i>{entry.typed}</i>. The correct spelling for this meaning is <b>{entry.term}</b>.
+        </div>
+      )}
       <p style={{ fontFamily: "ui-serif, Georgia, serif", fontSize: 16, color: INK, lineHeight: 1.6, margin: 0 }}>
         {entry.definition}
       </p>
@@ -1515,9 +1522,14 @@ function WiseApp() {
       if (!parsed.definition) {
         throw new Error("Response parsed but had no 'definition' field. Raw: " + JSON.stringify(parsed).slice(0, 300));
       }
+      // If the student typed a misspelling or the wrong homophone, show the correct word as the heading.
+      const fixed = (parsed.corrected || "").trim();
+      const isFixed = fixed && fixed.toLowerCase() !== term.toLowerCase();
+      const shownTerm = isFixed ? fixed : term;
       addEntry({
-        id: slugify(term),
-        term,
+        id: slugify(shownTerm),
+        term: shownTerm,
+        typed: isFixed ? term : null,
         domain: parsed.domain || "General",
         definition: parsed.definition,
         pair: null,
